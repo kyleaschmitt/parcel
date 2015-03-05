@@ -1,4 +1,4 @@
-DIRS = udt
+DIRS = udt src
 TARGETS = all clean install
 
 $(TARGETS): %: $(patsubst %, %.%, $(DIRS))

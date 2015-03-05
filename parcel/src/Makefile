@@ -39,6 +39,8 @@ endif
 LINK_FLAGS = -shared -Wl,-soname,lparcel.so
 DIR = $(shell pwd)
 
+INSTALL_PATH = '/usr/local/lib'
+
 APP = parcel
 APPOUT = parcel
 
@@ -51,10 +53,11 @@ all: $(APP)
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c
 
 parcel: parcel.o
-	$(C++) $(LINK_FLAGS) -o $(abspath $(dir mkfile_path))/lparcel.so $< libudt.so
+	$(C++) $(LINK_FLAGS) -o $(abspath $(dir mkfile_path))/lparcel.so $< $(INSTALL_PATH)/libudt.so
 
 clean:
 	rm -f *.o $(APP)
 
 install:
 	export PATH=$(DIR):$$PATH
+	cp lparcel.so libudt.so $(INSTALL_PATH)/

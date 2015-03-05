@@ -1,9 +1,11 @@
+import ctypes
 from ctypes import cdll, create_string_buffer
-lib = cdll.LoadLibrary('lparcel.so')
 import json
 import logging
 import atexit
 import sys
+import os
+import signal
 from functools import wraps
 from multiprocessing import Process
 
@@ -16,9 +18,14 @@ from const import (
     STATE_IDLE,
 )
 
-import signal
+# Load library
+INSTALL_PATH = '/usr/local/lib/'
+lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
+
+# Signal handling for external calls
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+# Logging
 log = logging.getLogger('parcel')
 log.setLevel(logging.DEBUG)
 log.propagate = False

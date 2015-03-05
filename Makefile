@@ -1,5 +1,5 @@
-DIRS = udt
-TARGETS = all clean
+DIRS = parcel
+TARGETS = all clean install
 
 $(TARGETS): %: $(patsubst %, %.%, $(DIRS))
 
