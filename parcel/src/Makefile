@@ -49,7 +49,7 @@ all: $(APP)
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c
 
-parcel: server.o
+parcel: parcel.o
 	$(C++) -shared -Wl,-soname,lparcel.so -o $(abspath $(dir mkfile_path))/lparcel.so $< libudt.so
 
 clean:

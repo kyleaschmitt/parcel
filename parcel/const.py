@@ -3,12 +3,9 @@ lib = cdll.LoadLibrary('lparcel.so')
 import logging
 import atexit
 
-from const import (
-    CONTROL_LEN, HANDSHAKE
-)
-
-
 log = logging.getLogger('parcel')
+
+
 
 
 class Server(object):
