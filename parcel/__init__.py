@@ -9,7 +9,7 @@ from multiprocessing import Process
 
 from const import (
     # Lengths
-    LEN_CONTROL, LEN_TOKEN, LEN_PAYLOAD_SIZE,
+    LEN_CONTROL, LEN_PAYLOAD_SIZE,
     # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     # States
@@ -33,7 +33,7 @@ def vec(val):
     return val if hasattr(val, '__iter__') else [val]
 
 
-def state_method(states):
+def state_method(*states):
     """Enter a new state
 
     :param states:
@@ -214,12 +214,12 @@ class ServerThread(ParcelThread):
         token = self.next_payload()
         log.info('Connected with token: "{}"'.format(token))
 
-    @state_method(['authenticate', 'event_loop'])
+    @state_method('authenticate', 'event_loop')
     def shut_down(self):
         log.info('Thread exiting cleanly.')
         self.live = False
 
-    @state_method(['event_loop'])
+    @state_method('event_loop')
     def download(self):
         file_id = self.next_payload()
         log.info('Download request: {}'.format(file_id))
@@ -228,7 +228,7 @@ class ServerThread(ParcelThread):
             'file_size': len(content)}))
         self.send(content, len(content))
 
-    @state_method(['authenticate', 'event_loop', 'download'])
+    @state_method('authenticate', 'event_loop', 'download')
     def event_loop(self):
         switch = {
             CNTL_EXIT: self.shut_down,
@@ -257,17 +257,16 @@ class Client(ParcelThread):
     def handshake(self):
         self.send_control(CNTL_HANDSHAKE)
         self.recv_control(CNTL_HANDSHAKE)
-        client_options = json.dumps({
+        self.send_payload(json.dumps({
             'num_crypto_threads': 1,
             'version': 0.1,
-        })
-        self.send_payload(client_options)
+        }))
 
     @state_method('handshake')
     def authenticate(self, token):
         self.send_payload(token)
 
-    @state_method('authenticate')
+    @state_method('authenticate', 'download')
     def download(self, uuid):
         self.send_control(CNTL_DOWNLOAD)
         self.send_payload(uuid)
