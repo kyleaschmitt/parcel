@@ -7,7 +7,12 @@ from functools import wraps
 import threading
 
 from const import (
-    CONTROL_LEN, HANDSHAKE, STATE_IDLE, TOKEN_LEN
+    # Lengths
+    LEN_CONTROL, LEN_TOKEN,
+    # Control messages
+    CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
+    # States
+    STATE_IDLE,
 )
 
 import signal
@@ -122,18 +127,17 @@ class ParcelThread(object):
         lib.send_data(self.socket, data, len(data))
 
     def close(self):
+        self.send_control(CNTL_EXIT)
         self.close_func(self.instance)
 
     def send_control(self, cntl):
-        cntl_buff = create_string_buffer(CONTROL_LEN)
+        cntl_buff = create_string_buffer(LEN_CONTROL)
         cntl_buff.raw = cntl
         self.send(cntl_buff)
 
     def recv_control(self, expected=None):
-        cntl_buff = create_string_buffer(CONTROL_LEN)
-        lib.read_size(self.socket, cntl_buff, CONTROL_LEN)
-        cntl = cntl_buff.value
-        log.debug('CONTROL: {}'.format(ord(cntl_buff.value)))
+        cntl = self.read_size(LEN_CONTROL)
+        log.debug('CONTROL: {}'.format(ord(cntl)))
         if expected is not None and cntl not in vec(expected):
             raise RuntimeError('Unexpected control msg: {} != {}'.format(
                 ord(cntl), ord(expected)))
@@ -141,8 +145,8 @@ class ParcelThread(object):
 
     @state_method(STATE_IDLE)
     def handshake(self):
-        self.send_control(HANDSHAKE)
-        self.recv_control(HANDSHAKE)
+        self.send_control(CNTL_HANDSHAKE)
+        self.recv_control(CNTL_HANDSHAKE)
 
     @state_method('handshake')
     def authenticate(self, *args, **kwargs):
@@ -158,6 +162,9 @@ class ServerThread(ParcelThread):
             close_func=lib.sthread_close,
         )
         self.authenticate()
+        self.live = True
+        while self.live:
+            self.event_loop()
 
     def clientport(self):
         return lib.sthread_get_clientport(self.instance)
@@ -167,13 +174,20 @@ class ServerThread(ParcelThread):
 
     @state_method('handshake')
     def recv_cmd(self):
-        self.send_control(HANDSHAKE)
+        self.send_control(CNTL_HANDSHAKE)
         r = self.recv_control()
-        assert r == HANDSHAKE
+        assert r == CNTL_HANDSHAKE
 
     @state_method('handshake')
     def authenticate(self):
         pass
+
+    @state_method(['authenticate', 'event_loop'])
+    def event_loop(self):
+        cntl = self.recv_control()
+        if cntl == CNTL_EXIT:
+            log.info('Received exit signal')
+            self.live = False
 
 
 class Client(ParcelThread):
@@ -192,3 +206,7 @@ class Client(ParcelThread):
     @state_method('handshake')
     def authenticate(self, token):
         pass
+
+    @state_method('authenticate')
+    def download(self, uuid):
+        self.send_control(CNTL_DOWNLOAD)

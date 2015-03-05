@@ -3,12 +3,13 @@
 ###############################################################################
 
 # ======== Lengths ========
-CONTROL_LEN = 10
-TOKEN_LEN = 60
+LEN_CONTROL = 10
+LEN_TOKEN = 60
 
 # ======== CONTROL TYPES ========
-HANDSHAKE = chr(1)
-EXIT = chr(2)
+CNTL_HANDSHAKE = chr(1)
+CNTL_DOWNLOAD = chr(1)
+CNTL_EXIT = chr(255)
 
 
 # ======== States ========
