@@ -7,7 +7,7 @@ from functools import wraps
 import threading
 
 from const import (
-    CONTROL_LEN, HANDSHAKE, STATE_IDLE
+    CONTROL_LEN, HANDSHAKE, STATE_IDLE, TOKEN_LEN
 )
 
 import signal
@@ -23,11 +23,23 @@ handler.setFormatter(formatter)
 log.addHandler(handler)
 
 
-def state_method(valid_prev_states):
+def vec(val):
+    return val if hasattr(val, '__iter__') else [val]
+
+
+def state_method(states):
+    """Enter a new state
+
+    :param states:
+        A list of str or single str specifying the states that are
+        valid preceeding this one
+
+    """
+
     def wrapper(func, *args, **kwargs):
         @wraps(func)
         def f(self, *args, **kwargs):
-            assert self.state in valid_prev_states, \
+            assert self.state in vec(states), \
                 '{} not a valid previous state'.format(self.state)
             self.state = func.__name__
             log.debug('Entering state: {}'.format(self.state))
@@ -90,6 +102,13 @@ class ParcelThread(object):
         return '<{}, instance: {}, socket: {}>'.format(
             type(self).__name__, self.instance, self.socket)
 
+    def read_size(self, size):
+        buff = create_string_buffer(size)
+        rs = lib.read_size(self.socket, buff, size)
+        if (rs == -1):
+            raise Exception('Unable to read from socket.')
+        return buff.value
+
     def read(self):
         while True:
             log.debug('Blocking read ...')
@@ -110,17 +129,24 @@ class ParcelThread(object):
         cntl_buff.raw = cntl
         self.send(cntl_buff)
 
-    def recv_control(self):
+    def recv_control(self, expected=None):
         cntl_buff = create_string_buffer(CONTROL_LEN)
         lib.read_size(self.socket, cntl_buff, CONTROL_LEN)
-        logging.debug('CONTROL: {}'.format(cntl_buff.value))
-        return cntl_buff.value
+        cntl = cntl_buff.value
+        log.debug('CONTROL: {}'.format(ord(cntl_buff.value)))
+        if expected is not None and cntl not in vec(expected):
+            raise RuntimeError('Unexpected control msg: {} != {}'.format(
+                ord(cntl), ord(expected)))
+        return cntl
 
     @state_method(STATE_IDLE)
     def handshake(self):
         self.send_control(HANDSHAKE)
-        r = self.recv_control()
-        assert r == HANDSHAKE
+        self.recv_control(HANDSHAKE)
+
+    @state_method('handshake')
+    def authenticate(self, *args, **kwargs):
+        raise NotImplementedError()
 
 
 class ServerThread(ParcelThread):
@@ -131,6 +157,7 @@ class ServerThread(ParcelThread):
             socket=lib.sthread_get_socket(instance),
             close_func=lib.sthread_close,
         )
+        self.authenticate()
 
     def clientport(self):
         return lib.sthread_get_clientport(self.instance)
@@ -144,10 +171,14 @@ class ServerThread(ParcelThread):
         r = self.recv_control()
         assert r == HANDSHAKE
 
+    @state_method('handshake')
+    def authenticate(self):
+        pass
+
 
 class Client(ParcelThread):
 
-    def __init__(self, host='localhost', port=9000):
+    def __init__(self, token, host='localhost', port=9000):
         client = lib.new_client()
         log.info('Connecting to server at {}:{}'.format(host, port))
         lib.client_start(client, str(host), str(port))
@@ -156,3 +187,8 @@ class Client(ParcelThread):
             socket=lib.client_get_socket(client),
             close_func=lib.client_close,
         )
+        self.authenticate(token)
+
+    @state_method('handshake')
+    def authenticate(self, token):
+        pass
