@@ -26,7 +26,7 @@ ifeq ($(arch), SPARC)
    CCFLAGS += -DSPARC
 endif
 
-LDFLAGS = -L../udt/src -lstdc++ -lpthread -lm
+LDFLAGS = -L../udt/src -lstdc++ -lpthread -lm -g
 
 ifeq ($(os), UNIX)
    LDFLAGS += -lsocket
@@ -36,6 +36,7 @@ ifeq ($(os), SUNOS)
    LDFLAGS += -lrt -lsocket
 endif
 
+LINK_FLAGS = -shared -Wl,-soname,lparcel.so
 DIR = $(shell pwd)
 
 APP = parcel
@@ -50,7 +51,7 @@ all: $(APP)
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c
 
 parcel: parcel.o
-	$(C++) -shared -Wl,-soname,lparcel.so -o $(abspath $(dir mkfile_path))/lparcel.so $< libudt.so
+	$(C++) $(LINK_FLAGS) -o $(abspath $(dir mkfile_path))/lparcel.so $< libudt.so
 
 clean:
 	rm -f *.o $(APP)

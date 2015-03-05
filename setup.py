@@ -3,5 +3,7 @@ from setuptools import setup
 setup(
     name='parcel',
     packages=["parcel"],
-    install_requires=[],
+    install_requires=[
+        'pycrypto'
+    ],
 )

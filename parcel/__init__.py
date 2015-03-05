@@ -1,10 +1,11 @@
 from ctypes import cdll, create_string_buffer
 lib = cdll.LoadLibrary('lparcel.so')
+import json
 import logging
 import atexit
 import sys
 from functools import wraps
-import threading
+from multiprocessing import Process
 
 from const import (
     # Lengths
@@ -48,9 +49,9 @@ def state_method(states):
                 'Moving from state <{}> to <{}> is invalid'.format(
                     self.state, func.__name__)
             self.state = func.__name__
-            log.debug('Entering state: {}'.format(self.state))
+            log.debug('{}: Entering state: {}'.format(self, self.state))
             func(self, *args, **kwargs)
-            log.debug('exiting state: {}'.format(self.state))
+            log.debug('{}: Exiting state: {}'.format(self, self.state))
         return f
     return wrapper
 
@@ -78,13 +79,10 @@ class Server(object):
         logging.info('New client: {}'.format(thread))
 
     def listen(self):
-        threads = []
         while True:
             sthread = ServerThread(lib.server_next_client(self.server))
-            t = threading.Thread(target=self.server_thread, args=(sthread,))
-            t.daemon = True
-            threads.append(t)
-            t.start()
+            p = Process(target=self.server_thread, args=(sthread,))
+            p.start()
 
 
 class ParcelThread(object):
@@ -105,7 +103,7 @@ class ParcelThread(object):
         self.handshake()
 
     def __repr__(self):
-        return '<{}, instance: {}, socket: {}>'.format(
+        return '<{}({}, {})>'.format(
             type(self).__name__, self.instance, self.socket)
 
     def read_size(self, size):
@@ -128,7 +126,9 @@ class ParcelThread(object):
         payload_size = self.read_payload_size()
         return self.read_size(payload_size)
 
-    def send_payload(self, payload, size):
+    def send_payload(self, payload, size=None):
+        if size is None:
+            size = len(payload)
         self.send_payload_size(size)
         self.send(payload, size)
 
@@ -164,9 +164,8 @@ class ParcelThread(object):
         return cntl
 
     @state_method(STATE_IDLE)
-    def handshake(self):
-        self.send_control(CNTL_HANDSHAKE)
-        self.recv_control(CNTL_HANDSHAKE)
+    def handshake(self, *args, **kwargs):
+        raise NotImplementedError()
 
     @state_method('handshake')
     def authenticate(self, *args, **kwargs):
@@ -185,6 +184,18 @@ class ServerThread(ParcelThread):
         self.live = True
         while self.live:
             self.event_loop()
+
+    @state_method(STATE_IDLE)
+    def handshake(self):
+        self.send_control(CNTL_HANDSHAKE)
+        self.recv_control(CNTL_HANDSHAKE)
+        client_option_str = self.next_payload()
+        try:
+            client_options = json.loads(client_option_str)
+        except:
+            log.error('Unable to process client options: {}'.format(
+                client_options))
+        log.debug('Client options: {}'.format(client_options))
 
     def clientport(self):
         return lib.sthread_get_clientport(self.instance)
@@ -212,6 +223,10 @@ class ServerThread(ParcelThread):
     def download(self):
         file_id = self.next_payload()
         log.info('Download request: {}'.format(file_id))
+        content = 'TEST FILE'
+        self.send_payload(json.dumps({
+            'file_size': len(content)}))
+        self.send(content, len(content))
 
     @state_method(['authenticate', 'event_loop', 'download'])
     def event_loop(self):
@@ -238,11 +253,27 @@ class Client(ParcelThread):
         )
         self.authenticate(token)
 
+    @state_method(STATE_IDLE)
+    def handshake(self):
+        self.send_control(CNTL_HANDSHAKE)
+        self.recv_control(CNTL_HANDSHAKE)
+        client_options = json.dumps({
+            'num_crypto_threads': 1,
+            'version': 0.1,
+        })
+        self.send_payload(client_options)
+
     @state_method('handshake')
     def authenticate(self, token):
-        self.send_payload(token, len(token))
+        self.send_payload(token)
 
     @state_method('authenticate')
     def download(self, uuid):
         self.send_control(CNTL_DOWNLOAD)
-        self.send_payload(uuid, len(uuid))
+        self.send_payload(uuid)
+        file_info = json.loads(self.next_payload())
+        size = file_info['file_size']
+        log.info('Downloading file: {}'.format(uuid))
+        log.info('Download size: {}'.format(size))
+        lib.client_recv_file(self.instance, uuid, size, 0)
+        log.info('Downloadloaded to file: {}'.format(uuid))

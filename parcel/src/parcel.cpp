@@ -11,14 +11,13 @@
 #include <iostream>
 #include <assert.h>
 #include <udt.h>
-#include "test_util.h"
+
+#define BUFF_SIZE 67108864
+#define EXTERN extern "C"
 
 using namespace std;
 
-#define EXTERN extern "C"
-
 void* recvdata(void*);
-
 class ServerThread
 {
 public:
@@ -69,6 +68,7 @@ public:
     int start(char *host, char *port);
     int send_stuff(char *data, int size);
     int read(char* buff, int len);
+
 };
 
 
@@ -190,6 +190,7 @@ int Client::start(char *host, char *port)
     freeaddrinfo(peer);
     return 0;
 }
+
 
 int Client::close()
 {
@@ -347,4 +348,11 @@ EXTERN UDTSOCKET sthread_get_socket(ServerThread *sthread){
 EXTERN UDTSOCKET client_get_socket(Client *client){
     cout << client->client << endl;
     return client->client;
+}
+
+EXTERN int client_recv_file(Client *client, char *path, int size,
+                                int64_t offset = 0){
+   fstream ofs(path, ios::out | ios::binary | ios::trunc);
+   UDT::recvfile(client->client, ofs, offset, size, 366000);
+   return 0;
 }
