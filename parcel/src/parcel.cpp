@@ -228,7 +228,7 @@ EXTERN int send_data(UDTSOCKET socket, char *data, int size)
 
 EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
 {
-    assert(len > 0);
+    assert(len >= 0);
     int rs = UDT::recv(socket, buff, len, 0);
     if (UDT::ERROR == rs) {
         if (UDT::getlasterror().getErrorCode() != 2001)
@@ -240,7 +240,7 @@ EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
 
 EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
 {
-    assert(len > 0);
+    assert(len >= 0);
     int rs = 0;
     int ret = 0;
     while (rs < len){

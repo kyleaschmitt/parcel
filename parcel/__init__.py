@@ -200,7 +200,8 @@ class ServerThread(ParcelThread):
 
     @state_method('handshake')
     def authenticate(self):
-        pass
+        token = self.next_payload()
+        log.info('Connected with token: "{}"'.format(token))
 
     @state_method(['authenticate', 'event_loop'])
     def shut_down(self):
@@ -239,7 +240,7 @@ class Client(ParcelThread):
 
     @state_method('handshake')
     def authenticate(self, token):
-        pass
+        self.send_payload(token, len(token))
 
     @state_method('authenticate')
     def download(self, uuid):

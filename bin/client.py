@@ -5,7 +5,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('file_ids', metavar='file_id', type=str, nargs='+',
                         help='uuids to download')
-    parser.add_argument('-t', '--token', type=str, help='authentication token')
+    parser.add_argument('-t', '--token', default='', type=str,
+                        help='authentication token')
 
     args = parser.parse_args()
     client = parcel.Client(args.token)
