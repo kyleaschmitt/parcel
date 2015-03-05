@@ -45,30 +45,33 @@ class Server(object):
 
 class ParcelThread(object):
 
-    def __init__(self, instance, read_func, send_func, close_func):
+    def __init__(self, instance, socket, close_func):
         """
         Creates a new udpipeClient instance from shared object library
         """
 
+        log.debug(
+            'New ParcelThread object with instance {}, with socket {}'.format(
+                instance, socket))
         atexit.register(self.close)
         self.instance = instance
-        self.read_func = read_func
-        self.send_func = send_func
+        self.socket = socket
         self.close_func = close_func
         self.buff_len = 64000000
         self.buff = create_string_buffer(self.buff_len)
+        self.handshake()
 
     def read(self):
         while True:
             log.debug('Blocking read ...')
-            rs = self.read_func(self.instance, self.buff, self.buff_len)
+            rs = lib.read_data(self.socket, self.buff, self.buff_len)
             if rs < 0:
                 raise StopIteration()
             log.debug('Read {} bytes'.format(rs))
             yield self.buff[:rs]
 
     def send(self, data):
-        self.send_func(self.instance, data, len(data))
+        lib.send_data(self.socket, data, len(data))
 
     def close(self):
         self.close_func(self.instance)
@@ -78,14 +81,22 @@ class ParcelThread(object):
         cntl_buff.raw = chr(cntl)
         self.send(cntl_buff)
 
+    def recv_control(self):
+        cntl_buff = create_string_buffer(CONTROL_LEN)
+        self.send(cntl_buff)
+
+    def handshake(self):
+        log.debug('Sending handshake')
+        self.send_control(HANDSHAKE)
+        log.debug('Waiting on handshake back')
+
 
 class ServerThread(ParcelThread):
 
     def __init__(self, instance):
         super(ServerThread, self).__init__(
             instance=instance,
-            read_func=lib.sthread_read,
-            send_func=lib.sthread_send,
+            socket=lib.sthread_get_socket(instance),
             close_func=lib.sthread_close,
         )
 
@@ -98,17 +109,12 @@ class ServerThread(ParcelThread):
 
 class Client(ParcelThread):
 
-    def __init__(self):
+    def __init__(self, host='localhost', port=9000):
+        client = lib.new_client()
+        log.info('Connecting to server at {}:{}'.format(host, port))
+        lib.client_start(client, str(host), str(port))
         super(Client, self).__init__(
-            instance=lib.new_client(),
-            read_func=lib.client_read,
-            send_func=lib.client_send,
+            instance=client,
+            socket=lib.client_get_socket(client),
             close_func=lib.client_close,
         )
-
-    def start(self, host='localhost', port=9000):
-        log.info('Connecting to server at {}:{}'.format(host, port))
-        lib.client_start(self.instance, str(host), str(port))
-        log.debug('Sending handshake')
-        self.send_control(HANDSHAKE)
-        log.debug('Waiting on handshake back')

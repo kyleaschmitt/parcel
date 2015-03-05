@@ -9,12 +9,13 @@
 #include <wspiapi.h>
 #endif
 #include <iostream>
+#include <assert.h>
 #include <udt.h>
 #include "test_util.h"
 
 using namespace std;
 
-#define WRAPPER extern "C"
+#define EXTERN extern "C"
 
 void* recvdata(void*);
 
@@ -207,7 +208,7 @@ int ServerThread::close(){
     return UDT::close(recver);
 }
 
-int send_data(UDTSOCKET socket, char *data, int size)
+EXTERN int send_data(UDTSOCKET socket, char *data, int size)
 {
     int ss = 0;
     int ssize = 0;
@@ -225,8 +226,9 @@ int send_data(UDTSOCKET socket, char *data, int size)
     return ssize;
 }
 
-int read_data(UDTSOCKET socket, char *buff, int len)
+EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
 {
+    assert(len > 0);
     int rs = UDT::recv(socket, buff, len, 0);
     if (UDT::ERROR == rs) {
         if (UDT::getlasterror().getErrorCode() != 2001)
@@ -235,6 +237,17 @@ int read_data(UDTSOCKET socket, char *buff, int len)
     }
     return rs;
 }
+
+EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
+{
+    assert(len > 0);
+    int rs = 0;
+    while (rs < len){
+        read_data(socket, buff+rs, len - rs);
+    }
+    return rs;
+}
+
 
 int Client::send_stuff(char *data, int size){
     return send_data(client, data, size);
@@ -256,69 +269,78 @@ int Client::read(char* buff, int len){
  *            Wrappers for CTypes Python bindings
  ***********************************************************************/
 
-WRAPPER Client* new_client(){
+EXTERN Client* new_client(){
     return new Client();
 }
 
-WRAPPER int client_start(Client *client, char *host, char *port){
+EXTERN int client_start(Client *client, char *host, char *port){
     return client->start(host, port);
 }
 
-WRAPPER int client_send(Client *client, char *data, int len){
+EXTERN int client_send(Client *client, char *data, int len){
     return client->send_stuff(data, len);
 }
 
-WRAPPER int client_close(Client *client){
+EXTERN int client_close(Client *client){
     client->close();
     delete client;
     return 0;
 }
 
-WRAPPER int client_read(Client *client, char *buff, int len){
+EXTERN int client_read(Client *client, char *buff, int len){
     return client->read(buff, len);
 }
 
-WRAPPER Server* new_server(){
+EXTERN Server* new_server(){
     return new Server();
 }
 
-WRAPPER ServerThread* server_next_client(Server *server){
+EXTERN ServerThread* server_next_client(Server *server){
     return server->next_client();
 }
 
-WRAPPER int sthread_read(ServerThread *sthread, char *buff, int len){
+EXTERN int sthread_read(ServerThread *sthread, char *buff, int len){
     return sthread->read(buff, len);
 }
 
-WRAPPER int sthread_send(ServerThread *sthread, char *data, int len){
+EXTERN int sthread_send(ServerThread *sthread, char *data, int len){
     return sthread->send_stuff(data, len);
 }
 
-WRAPPER int server_set_buffer_size(Server *server, int size){
+EXTERN int server_set_buffer_size(Server *server, int size){
     server->udt_buff = size;
     return 0;
 }
 
-WRAPPER int server_start(Server *server, char *host, char *port){
+EXTERN int server_start(Server *server, char *host, char *port){
     return server->start(host, port);
 }
 
-WRAPPER int server_close(Server *server){
+EXTERN int server_close(Server *server){
     server->close();
     delete server;
     return 0;
 }
 
-WRAPPER int sthread_close(Server *sthread){
+EXTERN int sthread_close(Server *sthread){
     sthread->close();
     delete sthread;
     return 0;
 }
 
-WRAPPER char* sthread_get_clienthost(ServerThread *sthread){
+EXTERN char* sthread_get_clienthost(ServerThread *sthread){
     return sthread->clienthost;
 }
 
-WRAPPER char* sthread_get_clientport(ServerThread *sthread){
+EXTERN char* sthread_get_clientport(ServerThread *sthread){
     return sthread->clientport;
+}
+
+EXTERN UDTSOCKET sthread_get_socket(ServerThread *sthread){
+    return sthread->recver;
+}
+
+EXTERN UDTSOCKET client_get_socket(Client *client){
+    cout << client->client << endl;
+    return client->client;
 }
