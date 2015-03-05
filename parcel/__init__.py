@@ -8,7 +8,7 @@ import threading
 
 from const import (
     # Lengths
-    LEN_CONTROL, LEN_TOKEN,
+    LEN_CONTROL, LEN_TOKEN, LEN_PAYLOAD_SIZE,
     # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     # States
@@ -45,7 +45,8 @@ def state_method(states):
         @wraps(func)
         def f(self, *args, **kwargs):
             assert self.state in vec(states), \
-                '{} not a valid previous state'.format(self.state)
+                'Moving from state <{}> to <{}> is invalid'.format(
+                    self.state, func.__name__)
             self.state = func.__name__
             log.debug('Entering state: {}'.format(self.state))
             func(self, *args, **kwargs)
@@ -114,6 +115,23 @@ class ParcelThread(object):
             raise Exception('Unable to read from socket.')
         return buff.value
 
+    def send_payload_size(self, size):
+        buff = create_string_buffer(LEN_PAYLOAD_SIZE)
+        buff.value = str(size)
+        self.send(buff, LEN_PAYLOAD_SIZE)
+
+    def read_payload_size(self):
+        payload_size = int(self.read_size(LEN_PAYLOAD_SIZE))
+        return payload_size
+
+    def next_payload(self):
+        payload_size = self.read_payload_size()
+        return self.read_size(payload_size)
+
+    def send_payload(self, payload, size):
+        self.send_payload_size(size)
+        self.send(payload, size)
+
     def read(self):
         while True:
             log.debug('Blocking read ...')
@@ -123,8 +141,10 @@ class ParcelThread(object):
             log.debug('Read {} bytes'.format(rs))
             yield self.buff[:rs]
 
-    def send(self, data):
-        lib.send_data(self.socket, data, len(data))
+    def send(self, data, size=None):
+        if size is None:
+            size = len(data)
+        lib.send_data(self.socket, data, size)
 
     def close(self):
         self.send_control(CNTL_EXIT)
@@ -183,11 +203,25 @@ class ServerThread(ParcelThread):
         pass
 
     @state_method(['authenticate', 'event_loop'])
+    def shut_down(self):
+        log.info('Thread exiting cleanly.')
+        self.live = False
+
+    @state_method(['event_loop'])
+    def download(self):
+        file_id = self.next_payload()
+        log.info('Download request: {}'.format(file_id))
+
+    @state_method(['authenticate', 'event_loop', 'download'])
     def event_loop(self):
+        switch = {
+            CNTL_EXIT: self.shut_down,
+            CNTL_DOWNLOAD: self.download,
+        }
         cntl = self.recv_control()
-        if cntl == CNTL_EXIT:
-            log.info('Received exit signal')
-            self.live = False
+        if cntl not in switch:
+            raise RuntimeError('Unknown control code {}'.format(cntl))
+        switch[cntl]()
 
 
 class Client(ParcelThread):
@@ -210,3 +244,4 @@ class Client(ParcelThread):
     @state_method('authenticate')
     def download(self, uuid):
         self.send_control(CNTL_DOWNLOAD)
+        self.send_payload(uuid, len(uuid))
