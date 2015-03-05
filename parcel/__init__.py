@@ -7,6 +7,8 @@ from const import (
     CONTROL_LEN, HANDSHAKE
 )
 
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 log = logging.getLogger('parcel')
 
@@ -59,9 +61,6 @@ class ParcelThread(object):
 
     def send(self, data):
         self.send_func(self.instance, data, len(data))
-
-    def send_control(self, cntl):
-
 
     def close(self):
         self.close_func(self.instance)
