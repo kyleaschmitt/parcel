@@ -23,8 +23,11 @@ class ServerThread
 public:
     UDTSOCKET recver;
     char* data;
+    char clienthost[NI_MAXHOST];
+    char clientport[NI_MAXSERV];
+
     int udt_buff;
-    ServerThread(UDTSOCKET *socket);
+    ServerThread(UDTSOCKET *socket, char* host, char* port);
     int read(char* buff, int len);
     int read_into(int fd, int len);
     int close();
@@ -89,24 +92,23 @@ int Server::start(char *host, char *port)
 
     // Setup address information
     if (0 != getaddrinfo(NULL, port, &hints, &res)){
-        cout << "illegal port number or port is busy: [" << port << "]" << endl;
+        cerr << "illegal port number or port is busy: [" << port << "]" << endl;
         return 0;
     }
     // Create the server socket
     serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     // Bind the server socket
     if (UDT::ERROR == UDT::bind(serv, res->ai_addr, res->ai_addrlen)){
-        cout << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
+        cerr << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
     freeaddrinfo(res);
 
     // Listen on the port
     if (UDT::ERROR == UDT::listen(serv, 10)){
-        cout << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
+        cerr << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
-    cout << "server is ready at port: " << port << endl;
 
     // Incoming connections should be recieved by calling
     // next_client() repeatedly
@@ -128,7 +130,7 @@ ServerThread *Server::next_client(){
     // Wait for the next connection
     recver = UDT::accept(serv, (sockaddr*)&clientaddr, &addrlen);
     if (UDT::INVALID_SOCK == recver){
-        cout << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
+        cerr << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
 
@@ -143,10 +145,8 @@ ServerThread *Server::next_client(){
                 sizeof(clientservice),
                 NI_NUMERICHOST|NI_NUMERICSERV);
 
-    cout << "new connection: " << clienthost << ":" << clientservice << endl;
-
     // Return a ServerThread object that belongs to the new client
-    return new ServerThread(new UDTSOCKET(recver));
+    return new ServerThread(new UDTSOCKET(recver), clienthost, clientservice);
 }
 
 Client::Client()
@@ -176,14 +176,14 @@ int Client::start(char *host, char *port)
     freeaddrinfo(local);
 
     if (0 != getaddrinfo(host, port, &hints, &peer)){
-        cout << "incorrect server/peer address. " << host << ":" << port
+        cerr << "incorrect server/peer address. " << host << ":" << port
              << endl;
         return 0;
     }
 
     // connect to the server, implicit bind
     if (UDT::ERROR == UDT::connect(client, peer->ai_addr, peer->ai_addrlen)){
-        cout << "connect: " << UDT::getlasterror().getErrorMessage() << endl;
+        cerr << "connect: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
     freeaddrinfo(peer);
@@ -196,7 +196,9 @@ int Client::close()
     return 0;
 }
 
-ServerThread::ServerThread(UDTSOCKET *usocket){
+ServerThread::ServerThread(UDTSOCKET *usocket, char *host, char *port){
+    memcpy(clienthost, host, NI_MAXHOST);
+    memcpy(clientport, port, NI_MAXSERV);
     recver = *(UDTSOCKET*)usocket;
     delete (UDTSOCKET*)usocket;
 }
@@ -209,7 +211,6 @@ int send_data(UDTSOCKET socket, char *data, int size)
 {
     int ss = 0;
     int ssize = 0;
-    cout << "sending " << size << " bytes." << endl;
     while (ssize < size) {
         // Send as much data as we can
         ss = UDT::send(socket, data + ssize, size - ssize, 0);
@@ -221,13 +222,11 @@ int send_data(UDTSOCKET socket, char *data, int size)
         // Increment the amount sent before repeating
         ssize += ss;
     }
-    cout << "sent " << ssize << " bytes." << endl;
     return ssize;
 }
 
 int read_data(UDTSOCKET socket, char *buff, int len)
 {
-    cout << "reading from socket: " << socket << endl;
     int rs = UDT::recv(socket, buff, len, 0);
     if (UDT::ERROR == rs) {
         if (UDT::getlasterror().getErrorCode() != 2001)
@@ -305,15 +304,21 @@ WRAPPER int server_start(Server *server, char *host, char *port){
 }
 
 WRAPPER int server_close(Server *server){
-    cout << "closing server" << endl;
     server->close();
     delete server;
     return 0;
 }
 
 WRAPPER int sthread_close(Server *sthread){
-    cout << "closing server thread" << endl;
     sthread->close();
     delete sthread;
     return 0;
+}
+
+WRAPPER char* sthread_get_clienthost(ServerThread *sthread){
+    return sthread->clienthost;
+}
+
+WRAPPER char* sthread_get_clientport(ServerThread *sthread){
+    return sthread->clientport;
 }
