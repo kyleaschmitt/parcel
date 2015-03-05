@@ -243,7 +243,7 @@ EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
     assert(len > 0);
     int rs = 0;
     while (rs < len){
-        read_data(socket, buff+rs, len - rs);
+        rs += read_data(socket, buff+rs, len - rs);
     }
     return rs;
 }

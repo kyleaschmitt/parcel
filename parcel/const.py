@@ -6,4 +6,9 @@
 CONTROL_LEN = 10
 
 # ======== CONTROL TYPES ========
-HANDSHAKE = 1
+HANDSHAKE = chr(1)
+EXIT = chr(2)
+
+
+# ======== States ========
+STATE_IDLE = 'STATE_IDLE'
