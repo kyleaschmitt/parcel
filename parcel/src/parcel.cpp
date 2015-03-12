@@ -15,6 +15,11 @@
 #define BUFF_SIZE 67108864
 #define EXTERN extern "C"
 
+#include <openssl/applink.c>
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 using namespace std;
 
 void* recvdata(void*);
@@ -169,7 +174,7 @@ int Client::start(char *host, char *port)
 
     if (0 != getaddrinfo(NULL, port, &hints, &local)){
         cout << "incorrect network address.\n" << endl;
-        return 0;
+        return -1;
     }
 
     client = UDT::socket(local->ai_family, local->ai_socktype,
@@ -179,13 +184,13 @@ int Client::start(char *host, char *port)
     if (0 != getaddrinfo(host, port, &hints, &peer)){
         cerr << "incorrect server/peer address. " << host << ":" << port
              << endl;
-        return 0;
+        return -1;
     }
 
     // connect to the server, implicit bind
     if (UDT::ERROR == UDT::connect(client, peer->ai_addr, peer->ai_addrlen)){
         cerr << "connect: " << UDT::getlasterror().getErrorMessage() << endl;
-        return 0;
+        return -1;
     }
     freeaddrinfo(peer);
     return 0;

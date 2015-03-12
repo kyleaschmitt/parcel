@@ -1,4 +1,3 @@
-import ctypes
 from ctypes import cdll, create_string_buffer
 import json
 import logging
@@ -8,6 +7,8 @@ import os
 import signal
 from functools import wraps
 from multiprocessing import Process
+import requests
+
 
 from const import (
     # Lengths
@@ -73,10 +74,19 @@ class Server(object):
         self.server = lib.new_server()
         atexit.register(self.close)
 
-    def start(self, host='localhost', port=9000):
+    def start(self, host='localhost', port=9000, sthread_args={}):
+        """
+
+        """
+
         log.info('Starting server at {}:{}'.format(host, port))
         lib.server_start(self.server, str(host), str(port))
         log.info('Server ready at {}:{}'.format(host, port))
+        self.sthread_args = sthread_args
+
+        # Check server thread args
+        assert 'data_server_url' in sthread_args
+
         self.listen()
 
     def close(self):
@@ -87,7 +97,8 @@ class Server(object):
 
     def listen(self):
         while True:
-            sthread = ServerThread(lib.server_next_client(self.server))
+            sthread = ServerThread(lib.server_next_client(
+                self.server), self.sthread_args)
             p = Process(target=self.server_thread, args=(sthread,))
             p.start()
 
@@ -181,12 +192,16 @@ class ParcelThread(object):
 
 class ServerThread(ParcelThread):
 
-    def __init__(self, instance):
+    def __init__(self, instance, sthread_args):
         super(ServerThread, self).__init__(
             instance=instance,
             socket=lib.sthread_get_socket(instance),
             close_func=lib.sthread_close,
         )
+
+        assert 'data_server_url' in sthread_args
+
+        self.sthread_args = sthread_args
         self.authenticate()
         self.live = True
         while self.live:
@@ -230,7 +245,10 @@ class ServerThread(ParcelThread):
     def download(self):
         file_id = self.next_payload()
         log.info('Download request: {}'.format(file_id))
-        content = 'TEST FILE'
+        log.info(self.sthread_args['data_server_url'])
+        r = requests.get('http://{}/{}'.format(
+            self.sthread_args['data_server_url'], file_id))
+        content = r.text
         self.send_payload(json.dumps({
             'file_size': len(content)}))
         self.send(content, len(content))
