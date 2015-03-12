@@ -9,6 +9,8 @@ import signal
 from functools import wraps
 from multiprocessing import Process
 
+import manifest
+
 from const import (
     # Lengths
     LEN_CONTROL, LEN_PAYLOAD_SIZE,
