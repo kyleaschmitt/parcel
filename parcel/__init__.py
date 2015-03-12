@@ -10,6 +10,8 @@ from multiprocessing import Process
 import requests
 
 
+import manifest
+
 from const import (
     # Lengths
     LEN_CONTROL, LEN_PAYLOAD_SIZE,
