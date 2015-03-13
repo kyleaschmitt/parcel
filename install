@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo 'Building libraries...'
+make
+echo 'Installing libraries to /usr/local/lib'
+sudo make install
+echo 'Installing python package'
+python setup.py install
