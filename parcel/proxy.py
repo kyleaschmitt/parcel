@@ -18,7 +18,7 @@ def _check_status_code(sthread, r, url):
     if r.status_code != 200:
         # Failed to get file, notify the client
         msg = 'Request failed: {} {}'.format(url, r.text)
-        log.warn(msg)
+        log.warn(str(msg))
         sthread.send_payload(json.dumps({
             'error': r.text, 'status_code': r.status_code}))
         raise RuntimeError(msg)
