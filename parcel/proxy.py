@@ -12,6 +12,9 @@ log = get_logger()
 
 
 def _check_status_code(sthread, r, url):
+    """Handle an un/successful requests.
+
+    """
     if r.status_code != 200:
         # Failed to get file, notify the client
         msg = 'Request failed: {} {}'.format(url, r.text)
@@ -47,14 +50,20 @@ def _send_file_header(sthread, r, url):
 
 
 def sthread_join_send_thread(sthread):
+    """If the sthread already has a send_thread, then join it
+
+    """
     if sthread.send_thread:
         sthread.send_thread.join()
         sthread.send_thread = None
 
 
 def _send_async(sthread, block):
+    """Join any previously started send thread, and start a new one
+
+    """
+
     sthread_join_send_thread(sthread)
-    log.debug('Writing block: {}'.format(len(block)))
     sthread.send_thread = Thread(target=sthread.send, args=(block, len(block)))
     sthread.send_thread.start()
 

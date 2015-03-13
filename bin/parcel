@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import argparse
 import parcel
 import logging
@@ -8,21 +9,34 @@ from parcel import manifest
 logging.root.setLevel(logging.INFO)
 
 
+def load_token(args):
+    if args.token_file:
+        with open(args.token_file, 'r') as f:
+            return f.read()
+    else:
+        return args.token
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
                         help='uuids to download')
-    parser.add_argument('-t', '--token', default='', type=str,
-                        help='authentication token')
     # NOTE should we allow this in combination w/ other file_ids?
     parser.add_argument('-m', '--manifest',
                         type=manifest.argparse_type,
                         default=list(),
-                        help='GDC Download anifest file.')
+                        help='GDC Download manifest file.')
     parser.add_argument('-p', '--port', default=9000, type=str,
                         help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
+
+    # Add token args
+    token_args = parser.add_mutually_exclusive_group(required=False)
+    token_args.add_argument('-t', '--token-file', default='', type=str,
+                            help='authentication token file')
+    token_args.add_argument('-T', '--token', default='', type=str,
+                            help='authentication token')
 
     args = parser.parse_args()
 
@@ -30,8 +44,11 @@ if __name__ == '__main__':
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
 
+    # Get token for authentication
+    token = load_token(args)
+
     # Create client
-    client = parcel.Client(args.token, port=args.port)
+    client = parcel.Client(token, port=args.port)
 
     # Send manifest files
     for entry in args.manifest:

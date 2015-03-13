@@ -6,4 +6,8 @@ setup(
     install_requires=[
         'voluptuous',
     ],
+    scripts=[
+        'bin/parcel',
+        'bin/parcel-server'
+    ]
 )

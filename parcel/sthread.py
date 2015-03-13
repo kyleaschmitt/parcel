@@ -68,7 +68,8 @@ class ServerThread(ParcelThread):
         """
 
         self.token = self.next_payload()
-        log.info('Connected with token: "{}"'.format(self.token))
+        if self.token:
+            log.info('Connected with token.')
 
     @state_method('authenticate', 'event_loop')
     def shut_down(self):
