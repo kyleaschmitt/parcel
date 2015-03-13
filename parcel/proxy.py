@@ -1,11 +1,5 @@
-from ctypes import cdll, create_string_buffer
 import json
-import atexit
-import os
-import signal
 import urlparse
-from functools import wraps
-from threading import Thread
 import requests
 
 from log import get_logger
@@ -19,12 +13,6 @@ from const import (
     STATE_IDLE,
 )
 
-# Load library
-INSTALL_PATH = '/usr/local/lib/'
-lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
-
-# Signal handling for external calls
-signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Logging
 log = get_logger()
@@ -66,8 +54,11 @@ def _send_file_header(self, r, url):
 
 
 def _stream_data_to_client(self, r, file_size):
+    """Buffer and send until StopIteration
+
+    """
+
     total_sent = 0
-    # Then streaming of the data itself.
     for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
         if not chunk:
             continue  # Empty are keep-alives.

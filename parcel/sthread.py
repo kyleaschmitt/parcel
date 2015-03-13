@@ -61,15 +61,6 @@ class ServerThread(ParcelThread):
         return lib.sthread_get_clienthost(self.instance)
 
     @state_method('handshake')
-    def recv_cmd(self):
-        """Get the next control state command
-
-        """
-        self.send_control(CNTL_HANDSHAKE)
-        r = self.recv_control()
-        assert r == CNTL_HANDSHAKE
-
-    @state_method('handshake')
     def authenticate(self):
         """Authentication stub
 
