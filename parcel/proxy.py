@@ -1,18 +1,11 @@
 import json
 import urlparse
 import requests
+from threading import Thread
 
 from log import get_logger
 
-from const import (
-    # Lengths
-    LEN_CONTROL, LEN_PAYLOAD_SIZE, RES_CHUNK_SIZE,
-    # Control messages
-    CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
-    # States
-    STATE_IDLE,
-)
-
+from const import RES_CHUNK_SIZE
 
 # Logging
 log = get_logger()
@@ -53,8 +46,17 @@ def _send_file_header(sthread, r, url):
     return size
 
 
+def sthread_join_send_thread(sthread):
+    if sthread.send_thread:
+        sthread.send_thread.join()
+        sthread.send_thread = None
+
+
 def _send_async(sthread, block):
-    return sthread.send(block, len(block))
+    sthread_join_send_thread(sthread)
+    log.debug('Writing block: {}'.format(len(block)))
+    sthread.send_thread = Thread(target=sthread.send, args=(block, len(block)))
+    sthread.send_thread.start()
 
 
 def _stream_data_to_client(sthread, r, file_size):
@@ -63,11 +65,18 @@ def _stream_data_to_client(sthread, r, file_size):
     """
 
     total_sent = 0
+
+    # Iterate over file and send async to client
     for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
         if not chunk:
             continue  # Empty are keep-alives.
         _send_async(sthread, chunk)
         total_sent += len(chunk)
+
+    # Wait for async send to finish
+    sthread_join_send_thread(sthread)
+
+    # Check size
     if total_sent != file_size:
         raise RuntimeError(
             'Proxy terminated prematurely: sent {} != expected {}'.format(
