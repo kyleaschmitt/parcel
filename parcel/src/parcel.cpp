@@ -15,11 +15,6 @@
 #define BUFF_SIZE 67108864
 #define EXTERN extern "C"
 
-#include <openssl/applink.c>
-#include <openssl/bio.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
 using namespace std;
 
 void* recvdata(void*);
@@ -132,6 +127,7 @@ ServerThread *Server::next_client(){
     UDTSOCKET recver;
     sockaddr_storage clientaddr;
     int addrlen = sizeof(clientaddr);
+
 
     // Wait for the next connection
     recver = UDT::accept(serv, (sockaddr*)&clientaddr, &addrlen);
@@ -358,6 +354,10 @@ EXTERN UDTSOCKET client_get_socket(Client *client){
 EXTERN int client_recv_file(Client *client, char *path, int size,
                                 int64_t offset = 0){
    fstream ofs(path, ios::out | ios::binary | ios::trunc);
-   UDT::recvfile(client->client, ofs, offset, size, 366000);
+   int64_t write_size;
+   write_size = UDT::recvfile(client->client, ofs, offset, size, 366000);
+   if (UDT::ERROR == write_size){
+       return -1;
+   }
    return 0;
 }

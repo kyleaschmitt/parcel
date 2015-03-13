@@ -6,11 +6,9 @@ import sys
 import os
 import signal
 from functools import wraps
-from multiprocessing import Process
+from threading import Thread
 import requests
 
-
-import manifest
 
 from const import (
     # Lengths
@@ -94,15 +92,18 @@ class Server(object):
     def close(self):
         lib.server_close(self.server)
 
-    def server_thread(self, thread):
-        logging.info('New client: {}'.format(thread))
+    def server_thread(self, instance):
+        try:
+            logging.info('New ServerThread: {}'.format(instance))
+            ServerThread(instance, **self.sthread_args)
+        except Exception, e:
+            log.error('ServerThread exception: {}'.format(str(e)))
 
     def listen(self):
         while True:
-            sthread = ServerThread(lib.server_next_client(
-                self.server), self.sthread_args)
-            p = Process(target=self.server_thread, args=(sthread,))
-            p.start()
+            instance = lib.server_next_client(self.server)
+            t = Thread(target=self.server_thread, args=(instance,))
+            t.start()
 
 
 class ParcelThread(object):
@@ -167,6 +168,7 @@ class ParcelThread(object):
         lib.send_data(self.socket, data, size)
 
     def close(self):
+        del self.buff
         self.send_control(CNTL_EXIT)
         self.close_func(self.instance)
 
@@ -194,16 +196,14 @@ class ParcelThread(object):
 
 class ServerThread(ParcelThread):
 
-    def __init__(self, instance, sthread_args):
+    def __init__(self, instance, data_server_url):
         super(ServerThread, self).__init__(
             instance=instance,
             socket=lib.sthread_get_socket(instance),
             close_func=lib.sthread_close,
         )
 
-        assert 'data_server_url' in sthread_args
-
-        self.sthread_args = sthread_args
+        self.data_server_url = data_server_url
         self.authenticate()
         self.live = True
         while self.live:
@@ -247,9 +247,7 @@ class ServerThread(ParcelThread):
     def download(self):
         file_id = self.next_payload()
         log.info('Download request: {}'.format(file_id))
-        log.info(self.sthread_args['data_server_url'])
-        r = requests.get('http://{}/{}'.format(
-            self.sthread_args['data_server_url'], file_id))
+        r = requests.get('http://{}/{}'.format(self.data_server_url, file_id))
         content = r.text
         self.send_payload(json.dumps({
             'file_size': len(content)}))
