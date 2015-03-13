@@ -4,6 +4,6 @@ setup(
     name='parcel',
     packages=["parcel"],
     install_requires=[
-        'pycrypto'
+        'voluptuous',
     ],
 )

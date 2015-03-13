@@ -270,8 +270,16 @@ class ServerThread(ParcelThread):
             }))
 
         # Client assumes a metadata response first.
-        size = int(r.headers['Content-Length'])
-        log.info('Request responded: {} bytes'.format(size))
+        try:
+            size = long(r.headers['Content-Length'])
+            log.info('Request responded: {} bytes'.format(size))
+        except KeyError:
+            msg = 'Request without length: {}'.format(url)
+            log.error(msg)
+            return self.send_payload(json.dumps({
+                'error': msg,
+                'status_code': r.status_code,
+            }))
 
         # Send file size to client
         self.send_payload(json.dumps({
@@ -284,7 +292,6 @@ class ServerThread(ParcelThread):
         for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
             if not chunk:
                 continue  # Empty are keep-alives.
-            print len(chunk)
             self.send(chunk, len(chunk))
 
     @state_method('authenticate', 'event_loop', 'download')
