@@ -27,6 +27,8 @@ if __name__ == '__main__':
                         help='GDC Download manifest file.')
     parser.add_argument('-p', '--port', default=9000, type=str,
                         help='parcel server port')
+    parser.add_argument('-i', '--host', default='localhost', type=str,
+                        help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
     parser.add_argument('-d', '--dir', default=None,
@@ -50,7 +52,7 @@ if __name__ == '__main__':
     token = load_token(args)
 
     # Create client
-    client = parcel.Client(token, port=args.port)
+    client = parcel.Client(token, host=args.host, port=args.port)
 
     # Create file list
     file_ids = [f['uuid'] for f in args.manifest] + args.file_ids

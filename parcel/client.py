@@ -84,11 +84,11 @@ class Client(ParcelThread):
 
         if file_info['error'] is None:
             size = int(file_info['file_size'])
-            log.info('Downloading file: {}'.format(file_id))
             log.info('Download size: {}'.format(size))
 
             # Create file path
             file_path = os.path.join(directory, file_id)
+            log.info('Downloading file: {}'.format(file_path))
 
             # Download files
             lib.client_recv_file(self.instance, file_path, size, 0)
