@@ -1,4 +1,5 @@
 import csv
+import argparse
 
 def parse(fd, delimiter='\t', quotechar='#', **kwargs):
     """Parses a manifest file string.
@@ -14,3 +15,5 @@ def parse(fd, delimiter='\t', quotechar='#', **kwargs):
 
     for row in manifest:
         yield row
+
+argparse_type = lambda x: parse(argparse.FileType('r')(x))
