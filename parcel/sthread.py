@@ -31,6 +31,7 @@ class ServerThread(ParcelThread):
         self.authenticate()
         self.token = None
         self.live = True
+        self.send_thread = None
         while self.live:
             self.event_loop()
 
@@ -78,13 +79,16 @@ class ServerThread(ParcelThread):
         log.info('Thread exiting cleanly.')
         self.live = False
 
+    def proxy_file_to_client(self, file_id):
+        return proxy_file_to_client(self, file_id)
+
     @state_method('event_loop')
     def download(self):
         """Proxy a file to the client
         """
         file_id = self.next_payload()
         try:
-            proxy_file_to_client(self, file_id)
+            self.proxy_file_to_client(file_id)
         except Exception, e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
 
