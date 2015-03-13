@@ -27,11 +27,13 @@ class ServerThread(ParcelThread):
             close_func=lib.sthread_close,
         )
 
+        # Initialize thread
         self.data_server_url = data_server_url
-        self.authenticate()
-        self.token = None
         self.live = True
         self.send_thread = None
+
+        # Start thread processing
+        self.authenticate()
         while self.live:
             self.event_loop()
 
