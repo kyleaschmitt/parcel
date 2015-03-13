@@ -169,7 +169,7 @@ int Client::start(char *host, char *port)
     hints.ai_socktype = SOCK_STREAM;
 
     if (0 != getaddrinfo(NULL, port, &hints, &local)){
-        cout << "incorrect network address.\n" << endl;
+        cerr << "incorrect network address.\n" << endl;
         return -1;
     }
 
@@ -219,7 +219,7 @@ EXTERN int send_data(UDTSOCKET socket, char *data, int size)
         ss = UDT::send(socket, data + ssize, size - ssize, 0);
         // Check for errors
         if (UDT::ERROR == ss){
-            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+            cerr << "send:" << UDT::getlasterror().getErrorMessage() << endl;
             break;
         }
         // Increment the amount sent before repeating
@@ -234,7 +234,7 @@ EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
     int rs = UDT::recv(socket, buff, len, 0);
     if (UDT::ERROR == rs) {
         if (UDT::getlasterror().getErrorCode() != 2001)
-            cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
+            cerr << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         return -1;
     }
     return rs;
@@ -347,7 +347,6 @@ EXTERN UDTSOCKET sthread_get_socket(ServerThread *sthread){
 }
 
 EXTERN UDTSOCKET client_get_socket(Client *client){
-    cout << client->client << endl;
     return client->client;
 }
 

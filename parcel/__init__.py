@@ -12,7 +12,7 @@ import requests
 
 from const import (
     # Lengths
-    LEN_CONTROL, LEN_PAYLOAD_SIZE,
+    LEN_CONTROL, LEN_PAYLOAD_SIZE, RES_CHUNK_SIZE,
     # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     # States
@@ -35,9 +35,6 @@ formatter = logging.Formatter(
 handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 log.addHandler(handler)
-
-# TODO these need to go somewhere in a config
-RES_CHUNK_SIZE = 64 * 1024 * 1024
 
 
 def vec(val):
@@ -250,29 +247,44 @@ class ServerThread(ParcelThread):
     @state_method('event_loop')
     def download(self):
         file_id = self.next_payload()
-        log.info('Download request: {}'.format(file_id))
-        
-        # TODO move this to a module?
-        
+        url = urlparse.urljoin(self.data_server_url, file_id)
+        log.info('Download request: {}'.format(url))
+
         headers = {
             'X-Auth-Token': self.token,
         }
-        
+
         r = requests.get(
-            urlparse.urljoin(self.data_server_url, file_id),
+            url,
             headers=headers,
             verify=False,
             stream=True,
         )
-        
+
+        if r.status_code != 200:
+            # Failed to get file, notify the client
+            log.warn('Request failed: {} {}'.format(url, r.text))
+            return self.send_payload(json.dumps({
+                'error': r.text,
+                'status_code': r.status_code,
+            }))
+
         # Client assumes a metadata response first.
+        size = int(r.headers['Content-Length'])
+        log.info('Request responded: {} bytes'.format(size))
+
+        # Send file size to client
         self.send_payload(json.dumps({
-            'file_size': int(r.headers['Content-Length']),
+            'error': None,
+            'file_size': size,
+            'status_code': r.status_code,
         }))
-        
+
         # Then streaming of the data itself.
         for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
-            if not chunk: continue # Empty are keep-alives.
+            if not chunk:
+                continue  # Empty are keep-alives.
+            print len(chunk)
             self.send(chunk, len(chunk))
 
     @state_method('authenticate', 'event_loop', 'download')
@@ -318,8 +330,13 @@ class Client(ParcelThread):
         self.send_control(CNTL_DOWNLOAD)
         self.send_payload(uuid)
         file_info = json.loads(self.next_payload())
-        size = int(file_info['file_size'])
-        log.info('Downloading file: {}'.format(uuid))
-        log.info('Download size: {}'.format(size))
-        lib.client_recv_file(self.instance, uuid, size, 0)
-        log.info('Downloadloaded to file: {}'.format(uuid))
+
+        if file_info['error'] is None:
+            size = int(file_info['file_size'])
+            log.info('Downloading file: {}'.format(uuid))
+            log.info('Download size: {}'.format(size))
+            lib.client_recv_file(self.instance, uuid, size, 0)
+            log.info('Downloadloaded to file: {}'.format(uuid))
+        else:
+            log.error('Unable to download file {}: {}'.format(
+                uuid, file_info))
