@@ -1,5 +1,9 @@
 import parcel
 import argparse
+import logging
+
+logging.root.setLevel(logging.INFO)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -9,7 +13,12 @@ if __name__ == '__main__':
                         help='parcel server port')
     parser.add_argument('-i', '--host', default='localhost', type=str,
                         help='parcel server port')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='verbose logging')
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.root.setLevel(logging.DEBUG)
 
     sthread_args = {
         'data_server_url': args.data_server_url,
