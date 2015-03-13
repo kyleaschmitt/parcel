@@ -14,7 +14,7 @@ def get_logger(name='parcel'):
     log = logging.getLogger(name)
     log.propagate = False
     formatter = logging.Formatter(
-        '[%(asctime)s][%(name)10s][%(levelname)7s] %(message)s')
+        '[%(asctime)s][%(name)8s][%(levelname)7s] %(message)s')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     log.addHandler(handler)

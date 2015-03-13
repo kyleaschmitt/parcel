@@ -2,7 +2,7 @@ from functools import wraps
 from log import get_logger
 
 # Logging
-log = get_logger()
+log = get_logger('util')
 
 
 def vec(val):
