@@ -5,6 +5,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data-server-url', required=True, type=str,
                         help='location of data server')
+    parser.add_argument('-p', '--port', default=9000, type=str,
+                        help='parcel server port')
     args = parser.parse_args()
 
     sthread_args = {
@@ -12,4 +14,4 @@ if __name__ == '__main__':
     }
 
     server = parcel.Server()
-    server.start(sthread_args=sthread_args)
+    server.start(port=args.port, sthread_args=sthread_args)

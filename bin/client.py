@@ -10,10 +10,12 @@ if __name__ == '__main__':
     # NOTE should we allow this in combination w/ other file_ids?
     parser.add_argument('-m', '--manifest', type=argparse.FileType('r'),
                         help='GDC Download anifest file.')
+    parser.add_argument('-p', '--port', default=9000, type=str,
+                        help='parcel server port')
 
     args = parser.parse_args()
 
-    client = parcel.Client(args.token)
+    client = parcel.Client(args.token, port=args.port)
 
     manifest = parcel.manifest.parse(args.manifest) if args.manifest else []
     for entry in manifest:
