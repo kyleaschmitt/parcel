@@ -16,7 +16,7 @@ lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Logging
-log = get_logger()
+log = get_logger('server')
 
 
 class Server(object):

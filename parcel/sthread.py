@@ -15,7 +15,7 @@ from const import (
 )
 
 # Logging
-log = get_logger()
+log = get_logger('sthread')
 
 
 class ServerThread(ParcelThread):
