@@ -40,7 +40,7 @@ class ParcelThread(object):
         self.buff_len = 64000000
         self.buff = create_string_buffer(self.buff_len)
         self.state = STATE_IDLE
-        log.info('New instance {}'.format(self))
+        log.debug('New instance {}'.format(self))
         self.handshake()
 
     def __repr__(self):

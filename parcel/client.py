@@ -63,6 +63,9 @@ class Client(ParcelThread):
             return
 
         for file_id in file_ids:
+            log.info('Found file id: {}'.format(file_id))
+
+        for file_id in file_ids:
             self.download(file_id, *args, **kwargs)
 
     @state_method('authenticate', 'download_files', 'download')
@@ -80,19 +83,25 @@ class Client(ParcelThread):
         file_info = json.loads(self.next_payload())
 
         if not directory:
-            directory = os.path.dirname(os.path.realpath(__file__))
+            directory = os.path.abspath(os.getcwd())
+
+        log.info('-'*40)
+        log.info('Starting download   : {}'.format(file_id))
+        log.info('-'*40)
 
         if file_info['error'] is None:
-            size = int(file_info['file_size'])
-            log.info('Download size: {}'.format(size))
+            file_size = int(file_info['file_size'])
+            file_name = file_info.get('file_name', None)
 
             # Create file path
             file_path = os.path.join(directory, file_id)
-            log.info('Downloading file: {}'.format(file_path))
+            log.info('File name           : {}'.format(file_name))
+            log.info('Download size       : {}'.format(file_size))
+            log.info('Downloading file to : {}'.format(file_path))
 
             # Download files
-            lib.client_recv_file(self.instance, file_path, size, 0)
-            log.info('Downloadloaded to file: {}'.format(file_id))
+            lib.client_recv_file(self.instance, file_path, file_size, 0)
+            log.info('Completed.')
         else:
             log.error('Unable to download file {}: {}'.format(
-                file_id, file_info))
+                file_id, file_info['error']))

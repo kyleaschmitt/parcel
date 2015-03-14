@@ -41,10 +41,14 @@ def _send_file_header(sthread, r, url):
         sthread.send_payload(json.dumps({
             'error': msg, 'status_code': r.status_code}))
 
+    attachment = r.headers.get('content-disposition', None)
+    file_name = attachment.split('filename=')[-1] if attachment else None
+
     # Send file header to client
     sthread.send_payload(json.dumps({
         'error': None,
         'file_size': size,
+        'file_name': file_name,
         'status_code': r.status_code,
     }))
     return size
@@ -95,42 +99,66 @@ def _read_range(args):
 
 
 def distribute(start, stop, block):
+    """return a list of blocks in sizes no larger than `block`, the last
+    block can be smaller.
+
+    """
     return [(a, min(stop, a+block)-1) for a in range(start, stop, block)]
 
 
 def _read_map_async(url, headers, pool, pool_size, block_size, start, max_len):
+    """Get all ranges from start to max_len.  assign one range per
+    process, discard the others.
+
+    :returns: async result object.  call .get() on it when you feel like data
+
+    """
+    # Get range for each process in pool
     ranges = distribute(start, max_len, block_size)[:pool_size]
+    # Create args for each process
     args = [[url, headers, beg, end] for beg, end in ranges]
+    # Async read from data server. Return handler, call .get() later
     return pool.map_async(_read_range, args)
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
-                                 processes=4):
+                                 processes=16):
     """Buffer and send until StopIteration
+
+    1. async buffer get in parallel
+    2. async send the blocks that we got last time (none the 1st round)
+    3. wait for the buffering to return
+    4. goto 1 until read complete
+    5. send last set of blocks
 
     """
 
     total_sent = 0
     pool = Pool(processes)
 
+    blocks = []
     while total_sent < file_size:
+        # Start new read
         async_read = _read_map_async(url, headers, pool, processes,
                                      RES_CHUNK_SIZE, total_sent,
                                      file_size)
-        log.debug('Joining reads')
-        blocks = async_read.get()
+        # Write any data we got last round, waits for last send to complete
         _send_async(sthread, blocks)
-        block_lens = [len(block) for block in blocks]
-        total_sent += sum(block_lens)
+        # Get more data while sending
+        blocks = async_read.get()
+        # Count the rest we just read
+        total_sent += sum([len(block) for block in blocks])
 
-    # Wait for async send and finish
+    # Send last round of data
+    _send_async(sthread, blocks)
+    # Wait for send to complete and close the pool
     sthread_join_send_thread(sthread)
     pool.close()
 
     # Check size
     if total_sent != file_size:
         raise RuntimeError(
-            'Proxy terminated prematurely: sent {} != expected {}'.format(
+            'Proxy terminated prematurely: sent {} != {} expected'.format(
                 total_sent, file_size))
 
 
