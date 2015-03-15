@@ -221,6 +221,7 @@ def parallel_http_download(url, token, file_id, directory, processes,
 
     total_sent = 0
     pool = Pool(processes)
+    f = open(file_path, 'wb')
 
     blocks = []
     while total_sent < size:
@@ -228,12 +229,18 @@ def parallel_http_download(url, token, file_id, directory, processes,
         async_read = _read_map_async(url, headers, pool, processes,
                                      RES_CHUNK_SIZE, total_sent,
                                      size, buffer_retries)
+        for block in blocks:
+            f.write(block)
         # Get more data while sending
         blocks = async_read.get()
         # Count the rest we just read
         total_sent += sum([len(block) for block in blocks])
 
+    for block in blocks:
+        f.write(block)
+
     pool.close()
+    f.close()
 
     # Check size
     if total_sent != size:
