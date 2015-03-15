@@ -5,6 +5,15 @@ from log import get_logger
 log = get_logger('util')
 
 
+def print_download_information(file_id, size, name, path):
+    log.info('-'*40)
+    log.info('Starting download   : {}'.format(file_id))
+    log.info('-'*40)
+    log.info('File name           : {}'.format(name))
+    log.info('Download size       : {}'.format(size))
+    log.info('Downloading file to : {}'.format(path))
+
+
 def vec(val):
     return val if hasattr(val, '__iter__') else [val]
 

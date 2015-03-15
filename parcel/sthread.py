@@ -2,10 +2,8 @@ from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
 from log import get_logger
-from proxy import proxy_file_to_client
+from http import proxy_file_to_client
 from const import (
-    # Lengths
-    LEN_CONTROL, LEN_PAYLOAD_SIZE, RES_CHUNK_SIZE,
     # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     # States
