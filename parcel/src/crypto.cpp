@@ -201,7 +201,18 @@ int ThreadedEncryption::map(char* data, char *dest, int len)
 
 int ThreadedEncryption::map_threaded(char* data, char *dest, int len)
 {
-    pass_to_enc_thread(data, dest, len);
+    int block_len = len/(n_threads + 1);
+    int sent = 0;
+    while (sent < len){
+        int this_size = std::min(len-sent, block_len);
+        pass_to_enc_thread(data+sent, dest+sent, this_size);
+        sent += this_size;
+    }
+    if (sent != len){
+        cerr << "error: Did not schedule full length of data"
+             << endl;
+        return -1;
+    }
     join_all_encryption_threads();
     return len;
 }
