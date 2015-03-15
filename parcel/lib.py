@@ -26,9 +26,9 @@ class ParcelDLL(object):
         self.read_size_no_encryption.argtypes = (c_int, c_void_p, c_int)
         self.read_size_no_encryption.restype = c_int
 
-        # int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket, char *buff, int len, int in_place)
+        # int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket, char *buff, int len)
         self.send_data = _lib.send_data
-        self.send_data.argtypes = (c_void_p, c_int, c_void_p, c_int, c_int)
+        self.send_data.argtypes = (c_void_p, c_int, c_void_p, c_int)
         self.send_data.restype = c_int
 
         # int send_data_no_encryption(UDTSOCKET socket, char *buff, int len)

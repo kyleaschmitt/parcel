@@ -81,7 +81,8 @@ class Client(ParcelThread):
 
         """
         self.send_control(CNTL_DOWNLOAD)
-        self.send_payload(file_id)
+        self.send_payload(json.dumps({
+            'file_id': file_id}))
         file_info = json.loads(self.next_payload())
 
         if not directory:

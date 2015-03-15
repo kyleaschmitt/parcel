@@ -63,14 +63,18 @@ class ParcelThread(object):
         return buff.value
 
     def send(self, data, size=None, encryption=True, encrypt_inplace=False):
+        if encrypt_inplace and encryption:
+            assert isinstance(data, str)
+            to_send = (data+'\0')[:-1]
+        else:
+            to_send = data
         if size is None:
             size = len(data)
         if encryption:
             self.assert_encryption()
-            in_place = 1 if encrypt_inplace else 0
-            lib.send_data(self.encryptor, self.socket, data, size, in_place)
+            lib.send_data(self.encryptor, self.socket, to_send, size)
         else:
-            lib.send_data_no_encryption(self.socket, data, size)
+            lib.send_data_no_encryption(self.socket, to_send, size)
 
     ############################################################
     #                     Transfer Functions

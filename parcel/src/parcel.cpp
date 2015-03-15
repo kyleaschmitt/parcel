@@ -265,7 +265,7 @@ EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int rs = read_data_no_encryption(socket, buff, len);
-    decryptor->map(buff, rs);
+    decryptor->map(buff, buff, rs);
     return rs;
 }
 
@@ -273,14 +273,14 @@ EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int rs = read_size_no_encryption(socket, buff, len);
-    decryptor->map(buff, rs);
+    decryptor->map(buff, buff, rs);
     return rs;
 }
 
 EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    encryptor->map(buff, len);
+    encryptor->map(buff, buff, len);
     int ss = send_data_no_encryption(socket, buff, len);
     return ss;
 }

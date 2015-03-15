@@ -91,7 +91,13 @@ class ServerThread(ParcelThread):
     def download(self):
         """Proxy a file to the client
         """
-        file_id = self.next_payload()
+        try:
+            file_request = json.loads(self.next_payload())
+            file_id = file_request['file_id']
+        except Exception, e:
+            self.send_payload(json.dumps({
+                'error': 'Malformed file_request: {}'.format(str(e))}))
+
         try:
             self.proxy_file_to_client(file_id)
         except Exception, e:

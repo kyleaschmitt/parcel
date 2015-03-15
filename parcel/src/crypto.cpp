@@ -85,7 +85,7 @@ ThreadedEncryption::ThreadedEncryption(int _direction,
     }
 }
 
-int ThreadedEncryption::crypto_update(char* data, int len)
+int ThreadedEncryption::crypto_update(char* data, char *dest, int len)
 {
     int evp_outlen = 0;
     int i = get_thread_id();
@@ -103,7 +103,7 @@ int ThreadedEncryption::crypto_update(char* data, int len)
     } else {
 
         // [en][de]crypt
-        if(!EVP_CipherUpdate(&ctx[i], (uchar*)data, &evp_outlen, (uchar*)data, len)){
+        if(!EVP_CipherUpdate(&ctx[i], (uchar*)data, &evp_outlen, (uchar*)dest, len)){
             fprintf(stderr, "encryption error\n");
             exit(EXIT_FAILURE);
         }
@@ -145,7 +145,7 @@ void *crypto_update_thread(void* _args)
         while (total < len){
             if(!EVP_CipherUpdate(&c->ctx[args->thread_id],
                                  args->data+total, &evp_outlen,
-                                 args->data+total, args->len-total)){
+                                 args->dest+total, args->len-total)){
                 fprintf(stderr, "encryption error\n");
                 exit(EXIT_FAILURE);
             }
@@ -180,7 +180,7 @@ int ThreadedEncryption::join_all_encryption_threads()
     return 0;
 }
 
-int ThreadedEncryption::pass_to_enc_thread(char* data, int len)
+int ThreadedEncryption::pass_to_enc_thread(char* data, char *dest, int len)
 {
     if (len == 0)
         return 0;
@@ -188,19 +188,20 @@ int ThreadedEncryption::pass_to_enc_thread(char* data, int len)
     lock_data(thread_id);
     increment_thread_id();
     e_args[thread_id].data = (uchar*) data;
+    e_args[thread_id].dest = (uchar*) dest;
     e_args[thread_id].len = len;
     set_thread_ready(thread_id);
     return 0;
 }
 
-int ThreadedEncryption::map(char* data, int len)
+int ThreadedEncryption::map(char* data, char *dest, int len)
 {
-    return crypto_update(data, len);
+    return crypto_update(data, dest, len);
 }
 
-int ThreadedEncryption::map_threaded(char* data, int len)
+int ThreadedEncryption::map_threaded(char* data, char *dest, int len)
 {
-    pass_to_enc_thread(data, len);
+    pass_to_enc_thread(data, dest, len);
     join_all_encryption_threads();
     return len;
 }

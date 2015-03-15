@@ -61,6 +61,7 @@ typedef unsigned char uchar;
 typedef struct e_thread_args
 {
     uchar *data;
+    uchar *dest;
     int len;
     EVP_CIPHER_CTX *ctx;
     int idle;
@@ -92,11 +93,11 @@ class ThreadedEncryption
     ThreadedEncryption(){}
 
 
-    int crypto_update(char *data, int len);
+    int crypto_update(char *data, char *dest, int len);
     int join_all_encryption_threads();
-    int pass_to_enc_thread(char *data, int len);
-    int map(char* data, int len);
-    int map_threaded(char* data, int len);
+    int pass_to_enc_thread(char *data, char *dest, int len);
+    int map(char* data, char *dest, int len);
+    int map_threaded(char* data, char *dest, int len);
 
     int get_num_crypto_threads(){
         return n_threads;
