@@ -114,7 +114,7 @@ class UDTClient(Client):
 
         file_size = int(file_info['file_size'])
         file_name = file_info.get('file_name', None)
-        file_path = os.path.join(directory, file_id)
+        file_path = os.path.join(directory, '{}.{}'.format(file_id, file_name))
 
         print_download_information(file_id, file_size, file_name, file_path)
 
@@ -167,7 +167,6 @@ class HTTPClient(Client):
     def download_file(self, file_id, directory=None, print_stats=False):
         if not directory:
             directory = os.path.abspath(os.getcwd())
-        file_path = os.path.join(directory, file_id)
         file_size = parallel_http_download(self.url, self.token, file_id,
-                                           file_path, self.n_processes)
+                                           directory, self.n_processes)
         return file_size

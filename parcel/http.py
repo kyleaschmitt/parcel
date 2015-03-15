@@ -2,6 +2,7 @@ import urlparse
 import requests
 from threading import Thread
 from multiprocessing.pool import Pool
+import os
 
 from log import get_logger
 from const import RES_CHUNK_SIZE
@@ -199,7 +200,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                 total_sent, file_size))
 
 
-def parallel_http_download(url, token, file_id, file_path, processes,
+def parallel_http_download(url, token, file_id, directory, processes,
                            verify=False, buffer_retries=4):
 
     url = urlparse.urljoin(url, file_id)
@@ -215,6 +216,7 @@ def parallel_http_download(url, token, file_id, file_path, processes,
     if errors:
         return -1
 
+    file_path = os.path.join(directory, '{}.{}'.format(file_id, file_name))
     print_download_information(file_id, size, file_name, file_path)
 
     total_sent = 0
