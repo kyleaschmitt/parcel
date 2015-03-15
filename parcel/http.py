@@ -29,6 +29,14 @@ def construct_header(token):
 
 
 def make_file_request(url, headers, verify=False):
+    """Make request for file, just get the header.
+
+    If unsuccessful, return errors. Return of NoneType means
+    success. This is atypical but useful.
+
+    :returns: (errormsg, file size, file_name, request status code)
+
+    """
     r = requests.get(url, headers=headers, verify=verify, stream=True)
     errors = _check_status_code(r, url)
     size, file_name = _parse_file_header(r, url)
@@ -39,10 +47,13 @@ def make_file_request(url, headers, verify=False):
 def _check_status_code(r, url):
     """Handle an un/successful requests.
 
+    If unsuccessful, return errors. Return of NoneType means
+    success. This is atypical but useful.
+
     """
     if r.status_code != 200:
         msg = 'Request failed: ERROR {}: {}'.format(
-            r.status_code, r.text)
+            r.status_code, r.text.replace('\n', ''))
         log.error(str(msg))
         return msg
     return None
@@ -51,7 +62,7 @@ def _check_status_code(r, url):
 def _parse_file_header(r, url):
     """Send a header to the client.
 
-    :returns: The file size
+    :returns: The file size and name
     """
 
     # Client assumes a metadata response first.
@@ -71,6 +82,8 @@ def _parse_file_header(r, url):
 def sthread_join_send_thread(sthread):
     """If the sthread already has a send_thread, then join it
 
+    :returns: None
+
     """
     if sthread.send_thread:
         sthread.send_thread.join()
@@ -78,6 +91,12 @@ def sthread_join_send_thread(sthread):
 
 
 def _send_blocks(sthread, blocks):
+    """Loop over blocks and send them serially.  Included here as a target
+    for async writes to UDT.
+
+    :returns: None
+
+    """
     for block in blocks:
         log.debug('Sending {} bytes'.format(len(block)))
         sthread.send(block, len(block))
@@ -85,6 +104,8 @@ def _send_blocks(sthread, blocks):
 
 def _send_async(sthread, blocks):
     """Join any previously started send thread, and start a new one
+
+    :returns: None
 
     """
     sthread_join_send_thread(sthread)
