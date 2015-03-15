@@ -48,11 +48,11 @@ class Server(object):
         lib.server_close(self.server)
 
     def server_thread(self, instance):
-        try:
-            log.info('New ServerThread: {}'.format(instance))
-            ServerThread(instance, **self.sthread_args)
-        except Exception, e:
-            log.error('ServerThread exception: {}'.format(str(e)))
+        # try:
+        #     log.info('New ServerThread: {}'.format(instance))
+        ServerThread(instance, **self.sthread_args)
+        # except Exception, e:
+        #     log.error('ServerThread exception: {}'.format(str(e)))
 
     def listen(self):
         while True:

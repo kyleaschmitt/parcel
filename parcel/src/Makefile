@@ -53,9 +53,6 @@ all: $(APP)
 parcel: parcel.o crypto.o
 	$(C++) $(LINK_FLAGS) -o $(so_path) $(INSTALL_PATH)/libudt.so parcel.o crypto.o $(LIBS)
 
-# parcel: parcel.o crypto.o
-# 	$(C++) $(LINK_FLAGS) -o $(so_path) $< $(INSTALL_PATH)/libudt.so
-
 clean:
 	rm -f *.o parcel.so
 

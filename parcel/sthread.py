@@ -31,13 +31,13 @@ class ServerThread(ParcelThread):
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
+        self.authenticate()
 
         # Start thread processing
-        self.authenticate()
         while self.live:
             self.event_loop()
 
-    @state_method(STATE_IDLE)
+    @state_method('initialize_encryption')
     def handshake(self):
         """Handshake steps
 
@@ -47,8 +47,8 @@ class ServerThread(ParcelThread):
 
         """
 
-        self.send_control(CNTL_HANDSHAKE)
-        self.recv_control(CNTL_HANDSHAKE)
+        self.send_control(CNTL_HANDSHAKE, encryption=False)
+        self.recv_control(CNTL_HANDSHAKE, encryption=False)
         client_option_str = self.next_payload()
         try:
             client_options = json.loads(client_option_str)
@@ -95,7 +95,8 @@ class ServerThread(ParcelThread):
         except Exception, e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
 
-    @state_method('authenticate', 'event_loop', 'download')
+    @state_method('authenticate', 'event_loop', 'download',
+                  'initialize_encryption')
     def event_loop(self):
         """Loop over client requests
 
@@ -109,7 +110,3 @@ class ServerThread(ParcelThread):
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
         switch[cntl]()
-
-    def initialize_crypto(self, n_threads=4):
-        key = str(range(256))[:256]
-        lib.sthread_initialize_crypto()

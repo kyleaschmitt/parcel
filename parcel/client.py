@@ -31,7 +31,7 @@ class Client(ParcelThread):
         )
         self.authenticate(token)
 
-    @state_method(STATE_IDLE)
+    @state_method('initialize_encryption')
     def handshake(self):
         """Handshake steps
 

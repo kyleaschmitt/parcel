@@ -19,6 +19,14 @@
 using namespace std;
 
 void* recvdata(void*);
+EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size);
+EXTERN int read_data_no_encryption(UDTSOCKET socket, char *data, int size);
+EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len);
+EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len);
+EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len);
+
 class ServerThread
 {
 public:
@@ -27,14 +35,9 @@ public:
     char clienthost[NI_MAXHOST];
     char clientport[NI_MAXSERV];
     int udt_buff;
-    ThreadedEncryption enc;
-    ThreadedEncryption dec;
 
     ServerThread(UDTSOCKET *socket, char* host, char* port);
-    int read(char* buff, int len);
-    int read_into(int fd, int len);
     int close();
-    int send_stuff(char *data, int size);
 };
 
 class Server
@@ -64,14 +67,10 @@ public:
     int udp_buff;
     int mss;
     UDTSOCKET client;
-    ThreadedEncryption enc;
-    ThreadedEncryption dec;
 
     Client();
     int close();
     int start(char *host, char *port);
-    int send_stuff(char *data, int size);
-    int read(char* buff, int len);
 };
 
 
@@ -202,6 +201,7 @@ int Client::close()
     return 0;
 }
 
+
 ServerThread::ServerThread(UDTSOCKET *usocket, char *host, char *port){
     memcpy(clienthost, host, NI_MAXHOST);
     memcpy(clientport, port, NI_MAXSERV);
@@ -213,7 +213,11 @@ int ServerThread::close(){
     return UDT::close(recver);
 }
 
-EXTERN int send_data(UDTSOCKET socket, char *data, int size)
+/***********************************************************************
+ *                           Data transfer
+ ***********************************************************************/
+
+EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size)
 {
     int ss = 0;
     int ssize = 0;
@@ -231,7 +235,7 @@ EXTERN int send_data(UDTSOCKET socket, char *data, int size)
     return ssize;
 }
 
-EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
+EXTERN int read_data_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
     int rs = UDT::recv(socket, buff, len, 0);
@@ -243,13 +247,13 @@ EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
     return rs;
 }
 
-EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
+EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
     int rs = 0;
     int ret = 0;
     while (rs < len){
-        if ((ret = read_data(socket, buff+rs, len - rs)) < 0){
+        if ((ret = read_data_no_encryption(socket, buff+rs, len - rs)) < 0){
             return ret;
         }
         rs += ret;
@@ -257,52 +261,53 @@ EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
     return rs;
 }
 
-
-int Client::send_stuff(char *data, int size){
-    return send_data(client, data, size);
+EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    cerr << "shouldn't be here" << endl;
+    return read_data_no_encryption(socket, buff, len);
 }
 
-int ServerThread::send_stuff(char *data, int size){
-    return send_data(recver, data, size);
+EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    cerr << "shouldn't be here" << endl;
+    return read_size_no_encryption(socket, buff, len);
 }
 
-int ServerThread::read(char* buff, int len){
-    return read_data(recver, buff, len);
+EXTERN int send_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    cerr << "shouldn't be here" << endl;
+    return send_data_no_encryption(socket, buff, len);
 }
 
-int Client::read(char* buff, int len){
-    return read_data(client, buff, len);
+
+/***********************************************************************
+ *                        Encryption functions
+ ***********************************************************************/
+
+EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
+{
+    return new ThreadedEncryption(EVP_ENCRYPT, (unsigned char*)key, n_threads);
+}
+
+EXTERN ThreadedEncryption *decryption_init(char *key, int n_threads)
+{
+    return new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
 }
 
 /***********************************************************************
- *            Wrappers for CTypes Python bindings
+ *                Wrappers for CTypes Python bindings
  ***********************************************************************/
 
 EXTERN Client* new_client(){
     return new Client();
 }
 
-EXTERN void client_crypto_init(Client *client, unsigned char *key,
-                              int n_threads)
-{
-    client->enc = ThreadedEncryption(EVP_ENCRYPT, key, n_threads);
-    client->dec = ThreadedEncryption(EVP_DECRYPT, key, n_threads);
-}
-
-EXTERN void sthread_crypto_init(ServerThread *sthread, unsigned char *key,
-                                int n_threads)
-{
-    sthread->enc = ThreadedEncryption(EVP_ENCRYPT, key, n_threads);
-    sthread->dec = ThreadedEncryption(EVP_DECRYPT, key, n_threads);
-}
-
 
 EXTERN int client_start(Client *client, char *host, char *port){
     return client->start(host, port);
-}
-
-EXTERN int client_send(Client *client, char *data, int len){
-    return client->send_stuff(data, len);
 }
 
 EXTERN int client_close(Client *client){
@@ -311,24 +316,12 @@ EXTERN int client_close(Client *client){
     return 0;
 }
 
-EXTERN int client_read(Client *client, char *buff, int len){
-    return client->read(buff, len);
-}
-
 EXTERN Server* new_server(){
     return new Server();
 }
 
 EXTERN ServerThread* server_next_client(Server *server){
     return server->next_client();
-}
-
-EXTERN int sthread_read(ServerThread *sthread, char *buff, int len){
-    return sthread->read(buff, len);
-}
-
-EXTERN int sthread_send(ServerThread *sthread, char *data, int len){
-    return sthread->send_stuff(data, len);
 }
 
 EXTERN int server_set_buffer_size(Server *server, int size){
