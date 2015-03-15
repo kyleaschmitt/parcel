@@ -19,10 +19,11 @@ def get_client(args, token):
             port=args.port,
             n_threads=args.n_threads,
         )
-    elif args.mode == 'http':
+    elif args.mode == 'https':
         client = parcel.HTTPClient(
             token,
-            n_threads=args.n_processes,
+            url=args.url,
+            n_processes=args.n_processes,
         )
     else:
         raise RuntimeError('Unknown functionality.')
@@ -54,8 +55,6 @@ if __name__ == '__main__':
                      help='parcel server port')
     udt.add_argument('-i', '--host', default='localhost', type=str,
                      help='parcel server port')
-    udt.add_argument('-x', '--no-stats', action='store_true',
-                     help='turn off statistics printing')
     # Add token args
     token_args = udt.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,
@@ -87,6 +86,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dir', default=None,
                         help='Directory to download files to. '
                         'Defaults to current dir')
+    parser.add_argument('-x', '--no-stats', action='store_true',
+                        help='turn off statistics printing')
     # Add token args
     token_args = parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,

@@ -156,16 +156,18 @@ class UDTClient(Client):
 
 class HTTPClient(Client):
 
-    def __init__(self, token, host='localhost', port=9000,
-                 n_threads=4):
-
-        self.n_threads = n_threads
+    def __init__(self, token, url, n_processes):
+        self.n_processes = n_processes
         self.token = token
+        self.url = url
+        self.state = STATE_IDLE
+        self.instance = None
+        self.socket = None
 
-    @state_method('authenticate', 'download_files', 'download_via_http')
-    def download_via_http(self, url, file_id, processes, directory=None,
-                          print_stats=False):
+    @state_method('download_files', 'download_file', STATE_IDLE)
+    def download_file(self, file_id, directory=None, print_stats=False):
         if not directory:
             directory = os.path.abspath(os.getcwd())
         file_path = os.path.join(directory, file_id)
-        parallel_http_download(file_id, file_path)
+        print file_path
+        # parallel_http_download(file_id, file_path)
