@@ -122,7 +122,7 @@ def _read_map_async(url, headers, pool, pool_size, block_size, start, max_len):
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
-                                 processes=16):
+                                 processes):
     """Buffer and send until StopIteration
 
     1. async buffer get in parallel
@@ -132,6 +132,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
     5. send last set of blocks
 
     """
+    log.info('Proxying {} to client'.format(url))
 
     total_sent = 0
     pool = Pool(processes)
@@ -162,7 +163,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                 total_sent, file_size))
 
 
-def proxy_file_to_client(sthread, file_id, verify=False):
+def proxy_file_to_client(sthread, file_id, processes, verify=False):
 
     url = urlparse.urljoin(sthread.data_server_url, file_id)
     log.info('Download request: {}'.format(url))
@@ -175,4 +176,4 @@ def proxy_file_to_client(sthread, file_id, verify=False):
     _check_status_code(sthread, r, url)
     size = _send_file_header(sthread, r, url)
     r.close()
-    _async_stream_data_to_client(sthread, url, size, headers)
+    _async_stream_data_to_client(sthread, url, size, headers, processes)

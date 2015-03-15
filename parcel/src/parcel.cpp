@@ -11,13 +11,31 @@
 #include <iostream>
 #include <assert.h>
 #include <udt.h>
+#include "crypto.h"
 
 #define BUFF_SIZE 67108864
+#define MSS 8400
 #define EXTERN extern "C"
 
 using namespace std;
 
+typedef struct monitor_args {
+    int stop;
+    int64_t downloaded;
+    int64_t file_size;
+    UDTSOCKET *s;
+} monitor_args;
+
 void* recvdata(void*);
+void* monitor(void* margs);
+EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size);
+EXTERN int read_data_no_encryption(UDTSOCKET socket, char *data, int size);
+EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len);
+EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len);
+EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len);
+
 class ServerThread
 {
 public:
@@ -25,13 +43,10 @@ public:
     char* data;
     char clienthost[NI_MAXHOST];
     char clientport[NI_MAXSERV];
-
     int udt_buff;
+
     ServerThread(UDTSOCKET *socket, char* host, char* port);
-    int read(char* buff, int len);
-    int read_into(int fd, int len);
     int close();
-    int send_stuff(char *data, int size);
 };
 
 class Server
@@ -49,7 +64,6 @@ public:
     ServerThread *next_client();
     int start(char *host, char *port);
     int set_buffer_size(int size);
-
 };
 
 
@@ -66,9 +80,6 @@ public:
     Client();
     int close();
     int start(char *host, char *port);
-    int send_stuff(char *data, int size);
-    int read(char* buff, int len);
-
 };
 
 
@@ -76,9 +87,9 @@ Server::Server()
 {
     blast = 0;
     blast_rate = 0;
-    udt_buff = 67108864;
-    udp_buff = 67108864;
-    mss = 8000;
+    udt_buff = BUFF_SIZE;
+    udp_buff = BUFF_SIZE;
+    mss = MSS;
 }
 
 int Server::start(char *host, char *port)
@@ -96,8 +107,14 @@ int Server::start(char *host, char *port)
         cerr << "illegal port number or port is busy: [" << port << "]" << endl;
         return 0;
     }
+
     // Create the server socket
     serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+    UDT::setsockopt(serv, 0, UDT_MSS, &mss, sizeof(int));
+    UDT::setsockopt(serv, 0, UDT_SNDBUF, &udt_buff, sizeof(int));
+    UDT::setsockopt(serv, 0, UDP_SNDBUF, &udp_buff, sizeof(int));
+
     // Bind the server socket
     if (UDT::ERROR == UDT::bind(serv, res->ai_addr, res->ai_addrlen)){
         cerr << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
@@ -155,9 +172,9 @@ Client::Client()
 {
     blast = 0;
     blast_rate = 0;
-    udt_buff = 67108864;
-    udp_buff = 67108864;
-    mss = 8000;
+    udt_buff = BUFF_SIZE;
+    udp_buff = BUFF_SIZE;
+    mss = MSS;
 }
 
 int Client::start(char *host, char *port)
@@ -176,6 +193,10 @@ int Client::start(char *host, char *port)
     client = UDT::socket(local->ai_family, local->ai_socktype,
                          local->ai_protocol);
     freeaddrinfo(local);
+
+    UDT::setsockopt(client, 0, UDT_MSS, &mss, sizeof(int));
+    UDT::setsockopt(client, 0, UDT_SNDBUF, &udt_buff, sizeof(int));
+    UDT::setsockopt(client, 0, UDP_SNDBUF, &udp_buff, sizeof(int));
 
     if (0 != getaddrinfo(host, port, &hints, &peer)){
         cerr << "incorrect server/peer address. " << host << ":" << port
@@ -199,6 +220,7 @@ int Client::close()
     return 0;
 }
 
+
 ServerThread::ServerThread(UDTSOCKET *usocket, char *host, char *port){
     memcpy(clienthost, host, NI_MAXHOST);
     memcpy(clientport, port, NI_MAXSERV);
@@ -210,7 +232,11 @@ int ServerThread::close(){
     return UDT::close(recver);
 }
 
-EXTERN int send_data(UDTSOCKET socket, char *data, int size)
+/***********************************************************************
+ *                           Data transfer
+ ***********************************************************************/
+
+EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size)
 {
     int ss = 0;
     int ssize = 0;
@@ -228,7 +254,7 @@ EXTERN int send_data(UDTSOCKET socket, char *data, int size)
     return ssize;
 }
 
-EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
+EXTERN int read_data_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
     int rs = UDT::recv(socket, buff, len, 0);
@@ -240,13 +266,13 @@ EXTERN int read_data(UDTSOCKET socket, char *buff, int len)
     return rs;
 }
 
-EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
+EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
     int rs = 0;
     int ret = 0;
     while (rs < len){
-        if ((ret = read_data(socket, buff+rs, len - rs)) < 0){
+        if ((ret = read_data_no_encryption(socket, buff+rs, len - rs)) < 0){
             return ret;
         }
         rs += ret;
@@ -254,37 +280,56 @@ EXTERN int read_size(UDTSOCKET socket, char *buff, int len)
     return rs;
 }
 
-
-int Client::send_stuff(char *data, int size){
-    return send_data(client, data, size);
+EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    int rs = read_data_no_encryption(socket, buff, len);
+    decryptor->map_threaded(buff, buff, rs);
+    return rs;
 }
 
-int ServerThread::send_stuff(char *data, int size){
-    return send_data(recver, data, size);
+EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    int rs = read_size_no_encryption(socket, buff, len);
+    decryptor->map_threaded(buff, buff, rs);
+    return rs;
 }
 
-int ServerThread::read(char* buff, int len){
-    return read_data(recver, buff, len);
+EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
+                     char *buff, int len)
+{
+    encryptor->map_threaded(buff, buff, len);
+    int ss = send_data_no_encryption(socket, buff, len);
+    return ss;
 }
 
-int Client::read(char* buff, int len){
-    return read_data(client, buff, len);
+
+/***********************************************************************
+ *                        Encryption functions
+ ***********************************************************************/
+
+EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
+{
+    return new ThreadedEncryption(EVP_ENCRYPT, (unsigned char*)key, n_threads);
+}
+
+EXTERN ThreadedEncryption *decryption_init(char *key, int n_threads)
+{
+    return new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
 }
 
 /***********************************************************************
- *            Wrappers for CTypes Python bindings
+ *                Wrappers for CTypes Python bindings
  ***********************************************************************/
 
 EXTERN Client* new_client(){
     return new Client();
 }
 
+
 EXTERN int client_start(Client *client, char *host, char *port){
     return client->start(host, port);
-}
-
-EXTERN int client_send(Client *client, char *data, int len){
-    return client->send_stuff(data, len);
 }
 
 EXTERN int client_close(Client *client){
@@ -293,24 +338,12 @@ EXTERN int client_close(Client *client){
     return 0;
 }
 
-EXTERN int client_read(Client *client, char *buff, int len){
-    return client->read(buff, len);
-}
-
 EXTERN Server* new_server(){
     return new Server();
 }
 
 EXTERN ServerThread* server_next_client(Server *server){
     return server->next_client();
-}
-
-EXTERN int sthread_read(ServerThread *sthread, char *buff, int len){
-    return sthread->read(buff, len);
-}
-
-EXTERN int sthread_send(ServerThread *sthread, char *data, int len){
-    return sthread->send_stuff(data, len);
 }
 
 EXTERN int server_set_buffer_size(Server *server, int size){
@@ -350,13 +383,70 @@ EXTERN UDTSOCKET client_get_socket(Client *client){
     return client->client;
 }
 
-EXTERN int client_recv_file(Client *client, char *path, int size,
-                                int64_t offset = 0){
-   fstream ofs(path, ios::out | ios::binary | ios::trunc);
-   int64_t write_size;
-   write_size = UDT::recvfile(client->client, ofs, offset, size, 366000);
-   if (UDT::ERROR == write_size){
-       return -1;
-   }
-   return 0;
+
+EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
+                                  char *path, int64_t size,
+                                  int64_t block_size, int print_stats)
+{
+    char *buffer = new char[block_size];
+    fstream ofs(path, ios::out | ios::binary | ios::trunc);
+    int64_t total_read = 0;
+    pthread_t mon_thread;
+    monitor_args margs;
+
+    if (print_stats){
+        margs.s = &client->client;
+        margs.stop = 0;
+        margs.downloaded = 0;
+        margs.file_size = size;
+        pthread_create(&mon_thread, NULL, monitor, &margs);
+    }
+
+    while (total_read < size){
+        int64_t this_size = min(size-total_read, block_size);
+        int rs = read_size(decryptor, client->client, buffer, this_size);
+        if (rs < 0){
+            return -1;
+        }
+        ofs.write(buffer, this_size);
+        total_read += rs;
+        if (print_stats){
+            margs.downloaded = total_read;
+        }
+    }
+    ofs.close();
+    delete buffer;
+
+    if (print_stats){
+        margs.stop = 1;
+        pthread_join(mon_thread, NULL);
+    }
+
+    return total_read;
+}
+
+void* monitor(void* _arg)
+{
+    monitor_args *margs = (monitor_args*)_arg;
+    UDT::TRACEINFO perf;
+    while (!margs->stop) {
+        sleep(1);
+        if (UDT::ERROR == UDT::perfmon(*margs->s, &perf)) {
+            cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
+            break;
+        }
+        fprintf(stderr, "%c[2K\t\t", 27);  // Clear line
+        cerr.width(16);
+        cerr.precision(4);
+        cerr.setf( std::ios::fixed, std:: ios::floatfield );
+        cerr <<  "Gbps: " << perf.mbpsRecvRate/1e3;
+        cerr.width(8);
+        cerr.setf( std::ios::fixed, std:: ios::floatfield );
+        cerr << "\tGB: " << margs->downloaded/1e9/8;
+        cerr.width(18);
+        cerr << "File: " << margs->downloaded*100/margs->file_size << " %";
+        cerr << "\r";
+    }
+    cerr << endl;
+    return NULL;
 }

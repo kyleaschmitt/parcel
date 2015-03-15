@@ -25,6 +25,8 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--manifest', type=manifest.argparse_type,
                         default=list(),
                         help='GDC Download manifest file.')
+    parser.add_argument('-n', '--n-threads', type=int, default=4,
+                        help='Number of encryption threads.')
     parser.add_argument('-p', '--port', default=9000, type=str,
                         help='parcel server port')
     parser.add_argument('-i', '--host', default='localhost', type=str,
@@ -34,6 +36,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dir', default=None,
                         help='Directory to download files to. '
                         'Defaults to current dir')
+    parser.add_argument('-x', '--no-stats', action='store_true',
+                        help='turn off statistics printing')
 
     # Add token args
     token_args = parser.add_mutually_exclusive_group(required=False)
@@ -52,10 +56,19 @@ if __name__ == '__main__':
     token = load_token(args)
 
     # Create client
-    client = parcel.Client(token, host=args.host, port=args.port)
+    client = parcel.Client(
+        token,
+        host=args.host,
+        port=args.port,
+        n_enc_threads=args.n_threads
+    )
 
     # Create file list
     file_ids = [f['uuid'] for f in args.manifest] + args.file_ids
 
     # Download files to current directory
-    client.download_files(file_ids, directory=args.dir)
+    client.download_files(
+        file_ids,
+        directory=args.dir,
+        print_stats=(not args.no_stats)
+    )

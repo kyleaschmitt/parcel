@@ -1,26 +1,21 @@
-from ctypes import cdll, create_string_buffer
+from ctypes import create_string_buffer
 import atexit
-import os
-import signal
 from utils import state_method, vec
+import json
 
 from log import get_logger
 
 from const import (
     # Lengths
-    LEN_CONTROL, LEN_PAYLOAD_SIZE, RES_CHUNK_SIZE,
+    LEN_CONTROL, LEN_PAYLOAD_SIZE,
     # Control messages
-    CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
+    CNTL_EXIT,
     # States
     STATE_IDLE,
 )
 
-# Load library
-INSTALL_PATH = '/usr/local/lib/'
-lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
+from lib import lib
 
-# Signal handling for external calls
-signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Logging
 log = get_logger('parcel')
@@ -33,77 +28,101 @@ class ParcelThread(object):
         Creates a new udpipeClient instance from shared object library
         """
 
+        self.state = STATE_IDLE
+        self.encryptor = None
+        self.decryptor = None
         atexit.register(self.close)
         self.instance = instance
         self.socket = socket
         self.close_func = close_func
-        self.buff_len = 64000000
-        self.buff = create_string_buffer(self.buff_len)
-        self.state = STATE_IDLE
         log.debug('New instance {}'.format(self))
-        self.handshake()
 
     def __repr__(self):
         return '<{}({}, {})>'.format(
             type(self).__name__, self.instance, self.socket)
 
-    def read_size(self, size):
+    def assert_encryption(self):
+        assert self.encryptor, 'Encryptor not initialized'
+        assert self.decryptor, 'Decryptor not initialized'
+
+    ############################################################
+    #                     Library Wrappers
+    ############################################################
+
+    def read_size(self, size, encryption=True):
         buff = create_string_buffer(size)
-        rs = lib.read_size(self.socket, buff, size)
+        if encryption:
+            self.assert_encryption()
+            rs = lib.read_size(self.decryptor, self.socket, buff, size)
+        else:
+            rs = lib.read_size_no_encryption(self.socket, buff, size)
         if (rs == -1):
             raise Exception('Unable to read from socket.')
         return buff.value
 
-    def send_payload_size(self, size):
-        buff = create_string_buffer(LEN_PAYLOAD_SIZE)
-        buff.value = str(size)
-        self.send(buff, LEN_PAYLOAD_SIZE)
-
-    def read_payload_size(self):
-        payload_size = int(self.read_size(LEN_PAYLOAD_SIZE))
-        return payload_size
-
-    def next_payload(self):
-        payload_size = self.read_payload_size()
-        return self.read_size(payload_size)
-
-    def send_payload(self, payload, size=None):
-        if size is None:
-            size = len(payload)
-        self.send_payload_size(size)
-        self.send(payload, size)
-
-    def read(self):
-        while True:
-            log.debug('Blocking read ...')
-            rs = lib.read_data(self.socket, self.buff, self.buff_len)
-            if rs < 0:
-                raise StopIteration()
-            log.debug('Read {} bytes'.format(rs))
-            yield self.buff[:rs]
-
-    def send(self, data, size=None):
+    def send(self, data, size=None, encryption=True, encrypt_inplace=False):
+        if encrypt_inplace and encryption:
+            assert isinstance(data, str)
+            to_send = (data+'\0')[:-1]
+        else:
+            to_send = data
         if size is None:
             size = len(data)
-        lib.send_data(self.socket, data, size)
+        if encryption:
+            self.assert_encryption()
+            lib.send_data(self.encryptor, self.socket, to_send, size)
+        else:
+            lib.send_data_no_encryption(self.socket, to_send, size)
 
-    def close(self):
-        del self.buff
-        self.send_control(CNTL_EXIT)
-        self.close_func(self.instance)
+    ############################################################
+    #                     Transfer Functions
+    ############################################################
 
-    def send_control(self, cntl):
+    def send_payload_size(self, size, **send_args):
+        buff = create_string_buffer(LEN_PAYLOAD_SIZE)
+        buff.value = str(size)
+        self.send(buff, LEN_PAYLOAD_SIZE, **send_args)
+
+    def read_payload_size(self, **read_args):
+        payload_size = int(self.read_size(LEN_PAYLOAD_SIZE, **read_args))
+        return payload_size
+
+    def next_payload(self, **read_args):
+        payload_size = self.read_payload_size(**read_args)
+        return self.read_size(payload_size, **read_args)
+
+    def send_payload(self, payload, size=None, **send_args):
+        if size is None:
+            size = len(payload)
+        self.send_payload_size(size, **send_args)
+        self.send(payload, size, **send_args)
+
+    def send_control(self, cntl, **send_args):
         cntl_buff = create_string_buffer(LEN_CONTROL)
         cntl_buff.raw = cntl
-        self.send(cntl_buff)
+        self.send(cntl_buff, LEN_CONTROL, **send_args)
 
-    def recv_control(self, expected=None):
-        cntl = self.read_size(LEN_CONTROL)
+    def recv_control(self, expected=None, **read_args):
+        cntl = self.read_size(LEN_CONTROL, **read_args)
         log.debug('CONTROL: {}'.format(ord(cntl)))
         if expected is not None and cntl not in vec(expected):
             raise RuntimeError('Unexpected control msg: {} != {}'.format(
                 ord(cntl), ord(expected)))
         return cntl
+
+    def send_json(self, doc, **send_args):
+        payload = json.dumps(doc)
+        self.send_payload(payload, size=len(payload), **send_args)
+
+    def read_json(self, **read_args):
+        return json.loads(self.next_payload(**read_args))
+
+    ############################################################
+    #                     State Functions
+    ############################################################
+
+    def close(self):
+        self.close_func(self.instance)
 
     @state_method(STATE_IDLE)
     def handshake(self, *args, **kwargs):

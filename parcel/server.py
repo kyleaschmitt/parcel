@@ -39,8 +39,14 @@ class Server(object):
         log.info('Server ready at {}:{}'.format(host, port))
         self.sthread_args = sthread_args
 
+        log.info('ServerThread args:')
+        for key, value in sthread_args.items():
+            log.info('|-- {}: {}'.format(key, value))
+
         # Check server thread args
         assert 'data_server_url' in sthread_args
+        assert 'max_enc_threads' in sthread_args
+        assert 'buffer_processes' in sthread_args
 
         self.listen()
 
@@ -48,11 +54,11 @@ class Server(object):
         lib.server_close(self.server)
 
     def server_thread(self, instance):
-        try:
-            log.info('New ServerThread: {}'.format(instance))
-            ServerThread(instance, **self.sthread_args)
-        except Exception, e:
-            log.error('ServerThread exception: {}'.format(str(e)))
+        # try:
+        #     log.info('New ServerThread: {}'.format(instance))
+        ServerThread(instance, **self.sthread_args)
+        # except Exception, e:
+        #     log.error('ServerThread exception: {}'.format(str(e)))
 
     def listen(self):
         while True:
