@@ -62,12 +62,13 @@ class ParcelThread(object):
             raise Exception('Unable to read from socket.')
         return buff.value
 
-    def send(self, data, size=None, encryption=True):
+    def send(self, data, size=None, encryption=True, encrypt_inplace=False):
         if size is None:
             size = len(data)
         if encryption:
             self.assert_encryption()
-            lib.send_data(self.encryptor, self.socket, data, size)
+            in_place = 1 if encrypt_inplace else 0
+            lib.send_data(self.encryptor, self.socket, data, size, in_place)
         else:
             lib.send_data_no_encryption(self.socket, data, size)
 
@@ -75,32 +76,32 @@ class ParcelThread(object):
     #                     Transfer Functions
     ############################################################
 
-    def send_payload_size(self, size, encryption=True):
+    def send_payload_size(self, size, **send_args):
         buff = create_string_buffer(LEN_PAYLOAD_SIZE)
         buff.value = str(size)
-        self.send(buff, LEN_PAYLOAD_SIZE, encryption)
+        self.send(buff, LEN_PAYLOAD_SIZE, **send_args)
 
-    def read_payload_size(self, encryption=True):
-        payload_size = int(self.read_size(LEN_PAYLOAD_SIZE))
+    def read_payload_size(self, **read_args):
+        payload_size = int(self.read_size(LEN_PAYLOAD_SIZE, **read_args))
         return payload_size
 
-    def next_payload(self, encryption=True):
+    def next_payload(self, **read_args):
         payload_size = self.read_payload_size()
-        return self.read_size(payload_size, encryption)
+        return self.read_size(payload_size, **read_args)
 
-    def send_payload(self, payload, size=None, encryption=True):
+    def send_payload(self, payload, size=None, **send_args):
         if size is None:
             size = len(payload)
-        self.send_payload_size(size, encryption)
-        self.send(payload, size, encryption)
+        self.send_payload_size(size, **send_args)
+        self.send(payload, size, **send_args)
 
-    def send_control(self, cntl, encryption=True):
-        cntl_buff = create_string_buffer(LEN_CONTROL, encryption)
+    def send_control(self, cntl, **send_args):
+        cntl_buff = create_string_buffer(LEN_CONTROL)
         cntl_buff.raw = cntl
-        self.send(cntl_buff, LEN_CONTROL, encryption)
+        self.send(cntl_buff, LEN_CONTROL, **send_args)
 
-    def recv_control(self, expected=None, encryption=True):
-        cntl = self.read_size(LEN_CONTROL, encryption)
+    def recv_control(self, expected=None, **read_args):
+        cntl = self.read_size(LEN_CONTROL, **read_args)
         log.debug('CONTROL: {}'.format(ord(cntl)))
         if expected is not None and cntl not in vec(expected):
             raise RuntimeError('Unexpected control msg: {} != {}'.format(

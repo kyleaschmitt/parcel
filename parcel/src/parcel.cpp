@@ -264,7 +264,6 @@ EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len)
 EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    cout << "decryptor: " << decryptor << endl;
     int rs = read_data_no_encryption(socket, buff, len);
     decryptor->map(buff, rs);
     return rs;
@@ -273,7 +272,6 @@ EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
 EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    cout << "decryptor: " << decryptor << endl;
     int rs = read_size_no_encryption(socket, buff, len);
     decryptor->map(buff, rs);
     return rs;
@@ -282,7 +280,7 @@ EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
 EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    // cout << "encryptor: " << encryptor << endl;    encryptor->map(buff, len);
+    encryptor->map(buff, len);
     int ss = send_data_no_encryption(socket, buff, len);
     return ss;
 }
@@ -294,24 +292,20 @@ EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
 
 EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
 {
-    ThreadedEncryption *encryptor = new ThreadedEncryption(EVP_ENCRYPT, (unsigned char*)key, n_threads);
-    cout << "encryptor: " << encryptor << endl;
-    return encryptor;
+    return new ThreadedEncryption(EVP_ENCRYPT, (unsigned char*)key, n_threads);
 }
 
 EXTERN ThreadedEncryption *decryption_init(char *key, int n_threads)
 {
-    ThreadedEncryption *decryptor = new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
-    cout << "decryptor: " << decryptor << endl;
-    return decryptor;
+    return new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
 }
 
 /***********************************************************************
  *                Wrappers for CTypes Python bindings
  ***********************************************************************/
 
-EXTERN void* new_client(){
-    return (void*)new Client();
+EXTERN Client* new_client(){
+    return new Client();
 }
 
 
