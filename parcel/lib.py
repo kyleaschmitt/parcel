@@ -75,12 +75,10 @@ class ParcelDLL(object):
         self.decryption_init.argtypes = (c_void_p, c_int)
         self.decryption_init.restype = c_void_p
 
-        # int client_recv_file(Client *client, char *path, int size, int64_t offset = 0)
+        # int client_recv_file(ThreadedEncryption *decryptor, Client *client, char *path, int64_t size, int64_t block_size)
         self.client_recv_file = _lib.client_recv_file
-        self.client_recv_file.argtypes = (c_void_p, c_void_p, c_int, c_longlong)
+        self.client_recv_file.argtypes = (c_void_p, c_void_p, c_void_p, c_longlong, c_longlong)
         self.client_recv_file.restype = c_int
-
-
 
         # self.temp = _lib.temp
         # self.temp.argtypes = (c_void_p, c_int)

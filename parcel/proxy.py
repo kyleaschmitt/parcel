@@ -132,6 +132,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
     5. send last set of blocks
 
     """
+    log.info('Proxying {} to client'.format(url))
 
     total_sent = 0
     pool = Pool(processes)

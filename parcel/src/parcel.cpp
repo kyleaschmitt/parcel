@@ -273,14 +273,14 @@ EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int rs = read_size_no_encryption(socket, buff, len);
-    decryptor->map_threaded(buff, buff, rs);
+    decryptor->map(buff, buff, rs);
     return rs;
 }
 
 EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    encryptor->map_threaded(buff, buff, len);
+    encryptor->map(buff, buff, len);
     int ss = send_data_no_encryption(socket, buff, len);
     return ss;
 }
@@ -364,13 +364,19 @@ EXTERN UDTSOCKET client_get_socket(Client *client){
     return client->client;
 }
 
-EXTERN int client_recv_file(Client *client, char *path, int size,
-                                int64_t offset = 0){
-   fstream ofs(path, ios::out | ios::binary | ios::trunc);
-   int64_t write_size;
-   write_size = UDT::recvfile(client->client, ofs, offset, size, 366000);
-   if (UDT::ERROR == write_size){
-       return -1;
-   }
-   return 0;
+EXTERN int client_recv_file(ThreadedEncryption *decryptor, Client *client,
+                            char *path, int64_t size,
+                            int64_t block_size){
+    char *buffer = new char[block_size];
+    fstream ofs(path, ios::out | ios::binary | ios::trunc);
+    int64_t total_read = 0;
+    while (total_read < size){
+        int64_t this_size = min(size-total_read, block_size);
+        int rs = read_size(decryptor, client->client, buffer, this_size);
+        ofs.write(buffer, this_size);
+        total_read += rs;
+    }
+    ofs.close();
+    delete buffer;
+    return 0;
 }

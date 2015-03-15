@@ -103,7 +103,9 @@ class Client(ParcelThread):
             log.info('Downloading file to : {}'.format(file_path))
 
             # Download files
-            lib.client_recv_file(self.instance, file_path, file_size, 0)
+            lib.client_recv_file(
+                self.decryptor, self.instance, file_path, file_size,
+                RES_CHUNK_SIZE)
             log.info('Completed.')
         else:
             log.error('Unable to download file {}: {}'.format(
