@@ -1,6 +1,5 @@
-from ctypes import cdll, create_string_buffer
+from ctypes import create_string_buffer
 import atexit
-import os
 import signal
 from utils import state_method, vec
 
@@ -15,9 +14,7 @@ from const import (
     STATE_IDLE,
 )
 
-# Load library
-INSTALL_PATH = '/usr/local/lib/'
-lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
+from lib import lib
 
 # Signal handling for external calls
 signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -41,8 +38,6 @@ class ParcelThread(object):
         self.socket = socket
         self.close_func = close_func
         log.debug('New instance {}'.format(self))
-        self.initialize_encryption()
-        self.handshake()
 
     def __repr__(self):
         return '<{}({}, {})>'.format(
@@ -57,7 +52,6 @@ class ParcelThread(object):
     ############################################################
 
     def read_size(self, size, encryption=True):
-        encryption = False
         buff = create_string_buffer(size)
         if encryption:
             self.assert_encryption()
@@ -69,7 +63,6 @@ class ParcelThread(object):
         return buff.value
 
     def send(self, data, size=None, encryption=True):
-        encryption = False
         if size is None:
             size = len(data)
         if encryption:
@@ -132,7 +125,6 @@ class ParcelThread(object):
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self):
-        # key = str(range(256)).encode('hex')[:256]
-        # self.encryptor = lib.encryption_init(key, 4)
-        # self.decryptor = lib.encryption_init(key, 4)
-        pass
+        key = str(range(256)).encode('hex')[:256]
+        self.encryptor = lib.encryption_init(key, 1)
+        self.decryptor = lib.decryption_init(key, 1)

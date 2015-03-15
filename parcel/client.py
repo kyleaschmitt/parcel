@@ -29,6 +29,8 @@ class Client(ParcelThread):
             socket=lib.client_get_socket(client),
             close_func=lib.client_close,
         )
+        self.initialize_encryption()
+        self.handshake()
         self.authenticate(token)
 
     @state_method('initialize_encryption')
@@ -41,8 +43,8 @@ class Client(ParcelThread):
 
         """
 
-        self.send_control(CNTL_HANDSHAKE)
-        self.recv_control(CNTL_HANDSHAKE)
+        self.send_control(CNTL_HANDSHAKE, encryption=False)
+        self.recv_control(CNTL_HANDSHAKE, encryption=False)
         self.send_payload(json.dumps({
             'num_crypto_threads': 1,
             'version': 0.1,

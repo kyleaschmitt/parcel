@@ -94,7 +94,7 @@ int ThreadedEncryption::crypto_update(char* data, int len)
 
     if (len == 0) {
 
-        // FINALIZE CIPHER
+        // finalize cipher
         if (!EVP_CipherFinal_ex(&ctx[i], (uchar*)data, &evp_outlen)) {
             fprintf(stderr, "encryption error\n");
             exit(EXIT_FAILURE);
@@ -102,13 +102,13 @@ int ThreadedEncryption::crypto_update(char* data, int len)
 
     } else {
 
-        // [EN][DE]CRYPT
+        // [en][de]crypt
         if(!EVP_CipherUpdate(&ctx[i], (uchar*)data, &evp_outlen, (uchar*)data, len)){
             fprintf(stderr, "encryption error\n");
             exit(EXIT_FAILURE);
         }
 
-        // DOUBLE CHECK
+        // double check lengths
         if (evp_outlen-len){
             fprintf(stderr, "Did not encrypt full length of data [%d-%d]",
                     evp_outlen, len);
@@ -133,14 +133,16 @@ void *crypto_update_thread(void* _args)
 
     e_thread_args* args = (e_thread_args*)_args;
     ThreadedEncryption *c = (ThreadedEncryption*)args->c;
+    int len;
+    int total;
 
     while (1) {
-        int len = args->len;
-        int total = 0;
 
         c->wait_thread_ready(args->thread_id);
+        len = args->len;
+        total = 0;
 
-        while (total < args->len){
+        while (total < len){
             if(!EVP_CipherUpdate(&c->ctx[args->thread_id],
                                  args->data+total, &evp_outlen,
                                  args->data+total, args->len-total)){
@@ -151,7 +153,8 @@ void *crypto_update_thread(void* _args)
         }
 
         if (len != args->len){
-            fprintf(stderr, "error: The length changed during encryption.\n\n");
+             cerr << "error: The length changed during encryption: "
+                  << total << " != " << len << endl;
             exit(1);
         }
 
@@ -188,6 +191,18 @@ int ThreadedEncryption::pass_to_enc_thread(char* data, int len)
     e_args[thread_id].len = len;
     set_thread_ready(thread_id);
     return 0;
+}
+
+int ThreadedEncryption::map(char* data, int len)
+{
+    return crypto_update(data, len);
+}
+
+int ThreadedEncryption::map_threaded(char* data, int len)
+{
+    pass_to_enc_thread(data, len);
+    join_all_encryption_threads();
+    return len;
 }
 
 /***********************************************************************

@@ -91,6 +91,13 @@ class ThreadedEncryption
 
     ThreadedEncryption(){}
 
+
+    int crypto_update(char *data, int len);
+    int join_all_encryption_threads();
+    int pass_to_enc_thread(char *data, int len);
+    int map(char* data, int len);
+    int map_threaded(char* data, int len);
+
     int get_num_crypto_threads(){
         return n_threads;
     }
@@ -126,11 +133,6 @@ class ThreadedEncryption
     int unlock_data(int thread_id){
         return pthread_mutex_unlock(&c_lock[thread_id]);
     }
-
-    int crypto_update(char *data, int len);
-    int join_all_encryption_threads();
-    int pass_to_enc_thread(char *data, int len);
-
 };
 
 void *crypto_update_thread(void* _args);

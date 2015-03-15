@@ -31,6 +31,8 @@ class ServerThread(ParcelThread):
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
+        self.initialize_encryption()
+        self.handshake()
         self.authenticate()
 
         # Start thread processing
