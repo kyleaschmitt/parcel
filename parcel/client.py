@@ -23,6 +23,9 @@ class Client(ParcelThread):
                  n_enc_threads=4, parallel_http=False):
 
         self.write_process = None
+        self.token = token
+        self.parallel_http = parallel_http
+
         if parallel_http:
             self.start_parallel_http_download(host, port, token)
         else:
@@ -36,7 +39,7 @@ class Client(ParcelThread):
             )
             self.initialize_encryption('', n_enc_threads)
             self.handshake()
-            self.authenticate(token)
+            self.authenticate()
 
     @state_method('initialize_encryption')
     def handshake(self):
@@ -56,8 +59,8 @@ class Client(ParcelThread):
         })
 
     @state_method('handshake')
-    def authenticate(self, token):
-        self.send_payload(token)
+    def authenticate(self):
+        self.send_payload(self.token)
 
     @state_method('authenticate', 'download_files', 'download')
     def download_files(self, file_ids, *args, **kwargs):
@@ -77,6 +80,14 @@ class Client(ParcelThread):
 
         self.send_control(CNTL_EXIT)
 
+    def print_download_information(self, file_id, size, name, path):
+        log.info('-'*40)
+        log.info('Starting download   : {}'.format(file_id))
+        log.info('-'*40)
+        log.info('File name           : {}'.format(name))
+        log.info('Download size       : {}'.format(size))
+        log.info('Downloading file to : {}'.format(path))
+
     @state_method('authenticate', 'download_files', 'download')
     def download(self, file_id, directory=None, print_stats=True):
         """Download steps:
@@ -87,6 +98,9 @@ class Client(ParcelThread):
         4. attempt to read into file
 
         """
+        if self.parallel_http:
+            raise NotImplementedError()
+
         self.send_control(CNTL_DOWNLOAD)
         self.send_json({'file_id': file_id})
         file_info = self.read_json()
@@ -94,32 +108,27 @@ class Client(ParcelThread):
         if not directory:
             directory = os.path.abspath(os.getcwd())
 
-        log.info('-'*40)
-        log.info('Starting download   : {}'.format(file_id))
-        log.info('-'*40)
-
-        if file_info['error'] is None:
-            file_size = int(file_info['file_size'])
-            file_name = file_info.get('file_name', None)
-
-            # Create file path
-            file_path = os.path.join(directory, file_id)
-            log.info('File name           : {}'.format(file_name))
-            log.info('Download size       : {}'.format(file_size))
-            log.info('Downloading file to : {}'.format(file_path))
-
-            # Download files
-            print_stats = 1 if print_stats else 0
-            ss = lib.client_recv_file(
-                self.decryptor, self.instance, file_path, file_size,
-                RES_CHUNK_SIZE, print_stats)
-            if ss != file_size:
-                raise RuntimeError('File not completed {} != {}'.format(
-                    ss, file_size))
-            log.info('Completed.')
-        else:
+        if file_info['error']:
             log.error('Unable to download file {}: {}'.format(
                 file_id, file_info['error']))
+            return False
+
+        file_size = int(file_info['file_size'])
+        file_name = file_info.get('file_name', None)
+        file_path = os.path.join(directory, file_id)
+
+        self.print_download_information(
+            file_id, file_size, file_name, file_path)
+
+        # Download files
+        print_stats = 1 if print_stats else 0
+        ss = lib.client_recv_file(
+            self.decryptor, self.instance, file_path, file_size,
+            RES_CHUNK_SIZE, print_stats)
+        if ss != file_size:
+            raise RuntimeError('File not completed {} != {}'.format(
+                ss, file_size))
+            log.info('Completed.')
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self, key, n_threads):
