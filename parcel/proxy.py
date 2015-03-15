@@ -122,7 +122,7 @@ def _read_map_async(url, headers, pool, pool_size, block_size, start, max_len):
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
-                                 processes=16):
+                                 processes=4):
     """Buffer and send until StopIteration
 
     1. async buffer get in parallel

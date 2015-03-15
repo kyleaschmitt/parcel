@@ -11,7 +11,7 @@ endif
 CCFLAGS = -Wall -D$(os) -I../udt/src -finline-functions -g -lcrypto -D_LARGE_FILE_SOURCE=1 -fPIC
 
 ifeq ($(arch), IA32)
-   CCFLAGS += -DIA32 #-mcpu=pentiumpro -march=pentiumpro -mmmx -msse
+    CCFLAGS += -DIA32 #-mcpu=pentiumpro -march=pentiumpro -mmmx -msse
 endif
 
 ifeq ($(arch), POWERPC)
@@ -36,7 +36,7 @@ ifeq ($(os), SUNOS)
    LDFLAGS += -lrt -lsocket
 endif
 
-LINK_FLAGS = -shared -Wl,-soname,lparcel.so
+LINK_FLAGS = -shared -Wl,-soname,lparcel.so -Bstatic
 DIR = $(shell pwd)
 
 INSTALL_PATH = '/usr/local/lib'
@@ -46,17 +46,18 @@ APPOUT = parcel
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
+so_path := $(abspath $(dir mkfile_path))/lparcel.so
 
 all: $(APP)
 
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c
 
-parcel: parcel.o
-	$(C++) $(LINK_FLAGS) -o $(abspath $(dir mkfile_path))/lparcel.so $< $(INSTALL_PATH)/libudt.so
+parcel: parcel.o crypto.o
+	$(C++) $(LINK_FLAGS) -o $(so_path) $< $(INSTALL_PATH)/libudt.so
 
 clean:
-	rm -f *.o $(APP)
+	rm -f *.o
 
 install:
 	export PATH=$(DIR):$$PATH
