@@ -1,7 +1,7 @@
 import os
 
 from parcel_thread import ParcelThread
-from utils import state_method
+from utils import state_method, print_download_information
 from lib import lib
 from log import get_logger
 from http import parallel_http_download
@@ -16,15 +16,6 @@ from const import (
 
 # Logging
 log = get_logger('client')
-
-
-def print_download_information(file_id, size, name, path):
-    log.info('-'*40)
-    log.info('Starting download   : {}'.format(file_id))
-    log.info('-'*40)
-    log.info('File name           : {}'.format(name))
-    log.info('Download size       : {}'.format(size))
-    log.info('Downloading file to : {}'.format(path))
 
 
 class Client(ParcelThread):
@@ -169,5 +160,5 @@ class HTTPClient(Client):
         if not directory:
             directory = os.path.abspath(os.getcwd())
         file_path = os.path.join(directory, file_id)
-        print file_path
-        # parallel_http_download(file_id, file_path)
+        parallel_http_download(self.url, self.token, file_id,
+                               file_path, self.n_processes)

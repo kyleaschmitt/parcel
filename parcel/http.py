@@ -5,6 +5,7 @@ from multiprocessing.pool import Pool
 
 from log import get_logger
 from const import RES_CHUNK_SIZE
+from utils import print_download_information
 
 # Logging
 log = get_logger()
@@ -198,9 +199,45 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                 total_sent, file_size))
 
 
-def parallel_http_download(url, file_id, processes, verify=False,
-                           buffer_retries=4):
-    print 'download file', file_id
+def parallel_http_download(url, token, file_id, file_path, processes,
+                           verify=False, buffer_retries=4):
+
+    url = urlparse.urljoin(url, file_id)
+
+    headers = construct_header(token)
+    try:
+        log.info('Request to {} to url'.format(url))
+        errors, size, file_name, status_code = make_file_request(url, headers)
+    except Exception as e:
+        log.error(str(e))
+        return str(e)
+
+    if errors:
+        return str(errors)
+
+    print_download_information(file_id, size, file_name, file_path)
+
+    total_sent = 0
+    pool = Pool(processes)
+
+    blocks = []
+    while total_sent < size:
+        # Start new read
+        async_read = _read_map_async(url, headers, pool, processes,
+                                     RES_CHUNK_SIZE, total_sent,
+                                     size, buffer_retries)
+        # Get more data while sending
+        blocks = async_read.get()
+        # Count the rest we just read
+        total_sent += sum([len(block) for block in blocks])
+
+    pool.close()
+
+    # Check size
+    if total_sent != size:
+        raise RuntimeError(
+            'Download terminated prematurely: sent {} != {} expected'.format(
+                total_sent, size))
 
 
 def proxy_file_to_client(sthread, file_id, processes, verify=False,
