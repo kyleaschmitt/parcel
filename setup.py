@@ -4,7 +4,7 @@ setup(
     name='parcel',
     packages=["parcel"],
     install_requires=[
-        'voluptuous',
+        'requests==2.5.1',
     ],
     scripts=[
         'bin/parcel',
