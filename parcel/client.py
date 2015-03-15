@@ -87,6 +87,10 @@ class UDTClient(Client):
     def authenticate(self):
         self.send_payload(self.token)
 
+    def close(self):
+        self.send_control(CNTL_EXIT)
+        self.close_func(self.instance)
+
     @state_method('authenticate', 'download_files', 'download_file')
     def download_file(self, file_id, directory=None, print_stats=True):
         """Download steps:
