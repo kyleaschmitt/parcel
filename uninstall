@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo 'Cleaning libraries...'
+make clean
+echo 'Removing libraries from /usr/local/lib'
+sudo make uninstall
+echo 'Removing python package'
+sudo $(which pip) -y uninstall parcel

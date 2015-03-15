@@ -59,3 +59,6 @@ clean:
 install:
 	export PATH=$(DIR):$$PATH
 	cp lparcel.so libudt.so $(INSTALL_PATH)/
+
+uninstall:
+	rm $(INSTALL_PATH)/lparcel.so $(INSTALL_PATH)/libudt.so

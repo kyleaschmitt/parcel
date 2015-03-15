@@ -1,5 +1,5 @@
-DIRS = udt src
-TARGETS = all clean install
+DIRS = src udt
+TARGETS = all clean install uninstall
 
 $(TARGETS): %: $(patsubst %, %.%, $(DIRS))
 

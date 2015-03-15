@@ -1,5 +1,5 @@
 DIRS = parcel
-TARGETS = all clean install
+TARGETS = all clean install uninstall
 
 $(TARGETS): %: $(patsubst %, %.%, $(DIRS))
 
