@@ -1,4 +1,5 @@
 import os
+import time
 
 from parcel_thread import ParcelThread
 from utils import state_method, print_download_information
@@ -34,7 +35,13 @@ class Client(ParcelThread):
             log.info('Found file id: {}'.format(file_id))
 
         for file_id in file_ids:
-            self.download_file(file_id, *args, **kwargs)
+            start = time.time()
+            file_size = self.download_file(file_id, *args, **kwargs)
+            stop = time.time()
+            if file_size > 0:
+                rate = (file_size*8/1e9) / (stop - start)
+                log.info(
+                    'Download complete: {0:.2f} Gbps average'.format(rate))
 
 
 class UDTClient(Client):
@@ -103,7 +110,7 @@ class UDTClient(Client):
         if file_info['error']:
             log.error('Unable to download file {}: {}'.format(
                 file_id, file_info['error']))
-            return False
+            return -1
 
         file_size = int(file_info['file_size'])
         file_name = file_info.get('file_name', None)
@@ -117,9 +124,10 @@ class UDTClient(Client):
             self.decryptor, self.instance, file_path, file_size,
             RES_CHUNK_SIZE, print_stats)
         if ss != file_size:
-            raise RuntimeError('File not completed {} != {}'.format(
+            log.error('File not completed {} != {}'.format(
                 ss, file_size))
-            log.info('Completed.')
+            return -1
+        return ss
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self, key, n_threads):
@@ -160,5 +168,6 @@ class HTTPClient(Client):
         if not directory:
             directory = os.path.abspath(os.getcwd())
         file_path = os.path.join(directory, file_id)
-        parallel_http_download(self.url, self.token, file_id,
-                               file_path, self.n_processes)
+        file_size = parallel_http_download(self.url, self.token, file_id,
+                                           file_path, self.n_processes)
+        return file_size
