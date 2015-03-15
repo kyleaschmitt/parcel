@@ -11,6 +11,7 @@
 #include <iostream>
 #include <assert.h>
 #include <udt.h>
+#include "crypto.h"
 
 #define BUFF_SIZE 67108864
 #define EXTERN extern "C"
@@ -25,8 +26,10 @@ public:
     char* data;
     char clienthost[NI_MAXHOST];
     char clientport[NI_MAXSERV];
-
     int udt_buff;
+    ThreadedEncryption enc;
+    ThreadedEncryption dec;
+
     ServerThread(UDTSOCKET *socket, char* host, char* port);
     int read(char* buff, int len);
     int read_into(int fd, int len);
@@ -49,7 +52,6 @@ public:
     ServerThread *next_client();
     int start(char *host, char *port);
     int set_buffer_size(int size);
-
 };
 
 
@@ -62,13 +64,14 @@ public:
     int udp_buff;
     int mss;
     UDTSOCKET client;
+    ThreadedEncryption enc;
+    ThreadedEncryption dec;
 
     Client();
     int close();
     int start(char *host, char *port);
     int send_stuff(char *data, int size);
     int read(char* buff, int len);
-
 };
 
 
@@ -278,6 +281,21 @@ int Client::read(char* buff, int len){
 EXTERN Client* new_client(){
     return new Client();
 }
+
+EXTERN void client_crypto_init(Client *client, unsigned char *key,
+                              int n_threads)
+{
+    client->enc = ThreadedEncryption(EVP_ENCRYPT, key, n_threads);
+    client->dec = ThreadedEncryption(EVP_DECRYPT, key, n_threads);
+}
+
+EXTERN void sthread_crypto_init(ServerThread *sthread, unsigned char *key,
+                                int n_threads)
+{
+    sthread->enc = ThreadedEncryption(EVP_ENCRYPT, key, n_threads);
+    sthread->dec = ThreadedEncryption(EVP_DECRYPT, key, n_threads);
+}
+
 
 EXTERN int client_start(Client *client, char *host, char *port){
     return client->start(host, port);

@@ -109,3 +109,7 @@ class ServerThread(ParcelThread):
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
         switch[cntl]()
+
+    def initialize_crypto(self, n_threads=4):
+        key = str(range(256))[:256]
+        lib.sthread_initialize_crypto()

@@ -112,3 +112,7 @@ class ParcelThread(object):
     @state_method('handshake')
     def authenticate(self, *args, **kwargs):
         raise NotImplementedError()
+
+    @state_method('handshake', 'authenticate')
+    def initialize_encryption(self, key, n_threads):
+        raise NotImplementedError()

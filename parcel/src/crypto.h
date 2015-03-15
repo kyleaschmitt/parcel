@@ -21,8 +21,6 @@ and limitations under the License.
 #define MAX_CRYPTO_THREADS 32
 #define USE_CRYPTO 1
 
-#define PASSPHRASE_SIZE 32
-#define HEX_PASSPHRASE_SIZE 64
 #define EVP_ENCRYPT 1
 #define EVP_DECRYPT 0
 #ifndef OPENSSL_HAS_CTR
@@ -48,6 +46,8 @@ and limitations under the License.
 #define MUTEX_LOCK(x)       pthread_mutex_lock(&x)
 #define MUTEX_UNLOCK(x)     pthread_mutex_unlock(&x)
 #define THREAD_ID           pthread_self()
+
+#define KEY_SIZE 256
 
 int THREAD_setup(void);
 int THREAD_cleanup(void);
@@ -77,8 +77,6 @@ class ThreadedEncryption
     pthread_mutex_t *thread_ready;
     unsigned char ivec[1024];
     pthread_mutex_t id_lock;
-    int key_size;
-    int hex_key_size;
     int n_threads;
     int thread_id;
 
@@ -90,6 +88,8 @@ class ThreadedEncryption
     ThreadedEncryption(int direc,
                        unsigned char* key,
                        int n_threads);
+
+    ThreadedEncryption(){}
 
     int get_num_crypto_threads(){
         return n_threads;

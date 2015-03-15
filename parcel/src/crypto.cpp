@@ -1,22 +1,14 @@
 #include <openssl/evp.h>
 #include <openssl/crypto.h>
-
-
 #include <time.h>
-
 #include <limits.h>
 #include <unistd.h>
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdlib.h>
-#define DEBUG 0
-
 #include "crypto.h"
-
-#define pris(x) if (DEBUG) fprintf(stderr,"[crypto] %s\n",x)
 
 #define MUTEX_TYPE         pthread_mutex_t
 #define MUTEX_SETUP(x)     pthread_mutex_init(&(x), NULL)
@@ -29,7 +21,6 @@
 static MUTEX_TYPE *mutex_buf = NULL;
 static void locking_function(int mode, int n, const char*file, int line);
 const int max_block_size = 64*1024;
-
 
 ThreadedEncryption::ThreadedEncryption(int _direction,
                                        unsigned char* _key,
@@ -66,6 +57,7 @@ ThreadedEncryption::ThreadedEncryption(int _direction,
         }
     }
 
+    // Initialize mutexes
     pthread_mutex_init(&id_lock, NULL);
     for (int i = 0; i < n_threads; i++){
         pthread_mutex_init(&c_lock[i], NULL);
@@ -79,8 +71,8 @@ ThreadedEncryption::ThreadedEncryption(int _direction,
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     thread_id = 0;
 
+    // Initialize thread args
     for (int i = 0; i < n_threads; i++){
-
         e_args[i].thread_id = i;
         e_args[i].ctx = &ctx[i];
         e_args[i].c = this;
@@ -95,7 +87,6 @@ ThreadedEncryption::ThreadedEncryption(int _direction,
 
 int ThreadedEncryption::crypto_update(char* data, int len)
 {
-
     int evp_outlen = 0;
     int i = get_thread_id();
     increment_thread_id();
@@ -206,7 +197,6 @@ int ThreadedEncryption::pass_to_enc_thread(char* data, int len)
 // Function for OpenSSL to lock mutex
 static void locking_function(int mode, int n, const char*file, int line)
 {
-    pris("LOCKING FUNCTION CALLED");
     if (mode & CRYPTO_LOCK)
         MUTEX_LOCK(mutex_buf[n]);
     else
@@ -223,8 +213,6 @@ static void threadid_func(CRYPTO_THREADID * id)
 
 int THREAD_setup(void)
 {
-
-    pris("Setting up threads");
     mutex_buf = (MUTEX_TYPE*)malloc(CRYPTO_num_locks()*sizeof(MUTEX_TYPE));
 
     if (!mutex_buf)
@@ -236,16 +224,12 @@ int THREAD_setup(void)
 
     CRYPTO_THREADID_set_callback(threadid_func);
     CRYPTO_set_locking_callback(locking_function);
-
-    pris("Locking and callback functions set");
-
     return 0;
 }
 
 // Cleans up the mutex buffer for openSSL
 int THREAD_cleanup(void)
 {
-    pris("Cleaning up threads");
     if (!mutex_buf)
         return 0;
 
