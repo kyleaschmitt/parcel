@@ -11,6 +11,24 @@ logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
 
 
+def get_client(args, token):
+    if args.mode == 'udt':
+        client = parcel.UDTClient(
+            token,
+            host=args.host,
+            port=args.port,
+            n_threads=args.n_threads,
+        )
+    elif args.mode == 'http':
+        client = parcel.HTTPClient(
+            token,
+            n_threads=args.n_processes,
+        )
+    else:
+        raise RuntimeError('Unknown functionality.')
+    return client
+
+
 def load_token(args):
     if args.token_file:
         with open(args.token_file, 'r') as f:
@@ -20,25 +38,55 @@ def load_token(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
-                        help='uuids to download')
+    subparsers = parser.add_subparsers(help='Download using UDT or HTTPS',
+                                       dest='mode')
+
+    #############################################################
+    #                      UDT options
+    #############################################################
+
+    udt = subparsers.add_parser('udt', help='Download files via UDT')
+    udt.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
+                     help='uuids to download')
+    udt.add_argument('-n', '--n-threads', type=int, default=4,
+                     help='Number of encryption/http threads.')
+    udt.add_argument('-p', '--port', default=9000, type=str,
+                     help='parcel server port')
+    udt.add_argument('-i', '--host', default='localhost', type=str,
+                     help='parcel server port')
+    udt.add_argument('-x', '--no-stats', action='store_true',
+                     help='turn off statistics printing')
+    # Add token args
+    token_args = udt.add_mutually_exclusive_group(required=False)
+    token_args.add_argument('-t', '--token-file', default='', type=str,
+                            help='authentication token file')
+    token_args.add_argument('-T', '--token', default='', type=str,
+                            help='authentication token')
+
+    #############################################################
+    #                      HTTP options
+    #############################################################
+
+    https = subparsers.add_parser('https', help='Download files via HTTPS')
+    https.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
+                       help='uuids to download')
+    https.add_argument('-n', '--n-processes', type=int, default=4,
+                       help='Number of http .')
+    https.add_argument('-u', '--url', required=True, type=str,
+                       help='Download api url to append file_ids to')
+
+    #############################################################
+    #                      General options
+    #############################################################
+
     parser.add_argument('-m', '--manifest', type=manifest.argparse_type,
                         default=list(),
                         help='GDC Download manifest file.')
-    parser.add_argument('-n', '--n-threads', type=int, default=4,
-                        help='Number of encryption threads.')
-    parser.add_argument('-p', '--port', default=9000, type=str,
-                        help='parcel server port')
-    parser.add_argument('-i', '--host', default='localhost', type=str,
-                        help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
     parser.add_argument('-d', '--dir', default=None,
                         help='Directory to download files to. '
                         'Defaults to current dir')
-    parser.add_argument('-x', '--no-stats', action='store_true',
-                        help='turn off statistics printing')
-
     # Add token args
     token_args = parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,
@@ -52,16 +100,8 @@ if __name__ == '__main__':
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
 
-    # Get token for authentication
     token = load_token(args)
-
-    # Create client
-    client = parcel.Client(
-        token,
-        host=args.host,
-        port=args.port,
-        n_enc_threads=args.n_threads
-    )
+    client = get_client(args, token)
 
     # Create file list
     file_ids = [f['uuid'] for f in args.manifest] + args.file_ids

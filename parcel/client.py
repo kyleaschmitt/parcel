@@ -4,6 +4,7 @@ from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
 from log import get_logger
+from http import parallel_http_download
 from const import (
     # Lengths
     RES_CHUNK_SIZE,
@@ -17,29 +18,53 @@ from const import (
 log = get_logger('client')
 
 
+def print_download_information(file_id, size, name, path):
+    log.info('-'*40)
+    log.info('Starting download   : {}'.format(file_id))
+    log.info('-'*40)
+    log.info('File name           : {}'.format(name))
+    log.info('Download size       : {}'.format(size))
+    log.info('Downloading file to : {}'.format(path))
+
+
 class Client(ParcelThread):
 
+    @state_method('authenticate', 'download_files', 'download', STATE_IDLE)
+    def download_files(self, file_ids, *args, **kwargs):
+        """Download a list of files
+
+        """
+
+        if not file_ids:
+            log.warn('No file ids given.')
+            return
+
+        for file_id in file_ids:
+            log.info('Found file id: {}'.format(file_id))
+
+        for file_id in file_ids:
+            self.download_file(file_id, *args, **kwargs)
+
+
+class UDTClient(Client):
+
     def __init__(self, token, host='localhost', port=9000,
-                 n_enc_threads=4, parallel_http=False):
+                 n_threads=4):
 
-        self.write_process = None
+        self.n_threads = n_threads
         self.token = token
-        self.parallel_http = parallel_http
 
-        if parallel_http:
-            self.start_parallel_http_download(host, port, token)
-        else:
-            client = lib.new_client()
-            log.info('Connecting to server at {}:{}'.format(host, port))
-            lib.client_start(client, str(host), str(port))
-            super(Client, self).__init__(
-                instance=client,
-                socket=lib.client_get_socket(client),
-                close_func=lib.client_close,
-            )
-            self.initialize_encryption('', n_enc_threads)
-            self.handshake()
-            self.authenticate()
+        client = lib.new_client()
+        log.info('Connecting to server at {}:{}'.format(host, port))
+        lib.client_start(client, str(host), str(port))
+        super(Client, self).__init__(
+            instance=client,
+            socket=lib.client_get_socket(client),
+            close_func=lib.client_close,
+        )
+        self.initialize_encryption('', n_threads)
+        self.handshake()
+        self.authenticate()
 
     @state_method('initialize_encryption')
     def handshake(self):
@@ -62,34 +87,8 @@ class Client(ParcelThread):
     def authenticate(self):
         self.send_payload(self.token)
 
-    @state_method('authenticate', 'download_files', 'download')
-    def download_files(self, file_ids, *args, **kwargs):
-        """Download a list of files
-
-        """
-
-        if not file_ids:
-            log.warn('No file ids given.')
-            return
-
-        for file_id in file_ids:
-            log.info('Found file id: {}'.format(file_id))
-
-        for file_id in file_ids:
-            self.download(file_id, *args, **kwargs)
-
-        self.send_control(CNTL_EXIT)
-
-    def print_download_information(self, file_id, size, name, path):
-        log.info('-'*40)
-        log.info('Starting download   : {}'.format(file_id))
-        log.info('-'*40)
-        log.info('File name           : {}'.format(name))
-        log.info('Download size       : {}'.format(size))
-        log.info('Downloading file to : {}'.format(path))
-
-    @state_method('authenticate', 'download_files', 'download')
-    def download(self, file_id, directory=None, print_stats=True):
+    @state_method('authenticate', 'download_files', 'download_file')
+    def download_file(self, file_id, directory=None, print_stats=True):
         """Download steps:
 
         1. notify server of download state
@@ -98,8 +97,6 @@ class Client(ParcelThread):
         4. attempt to read into file
 
         """
-        if self.parallel_http:
-            raise NotImplementedError()
 
         self.send_control(CNTL_DOWNLOAD)
         self.send_json({'file_id': file_id})
@@ -117,8 +114,7 @@ class Client(ParcelThread):
         file_name = file_info.get('file_name', None)
         file_path = os.path.join(directory, file_id)
 
-        self.print_download_information(
-            file_id, file_size, file_name, file_path)
+        print_download_information(file_id, file_size, file_name, file_path)
 
         # Download files
         print_stats = 1 if print_stats else 0
@@ -152,3 +148,20 @@ class Client(ParcelThread):
 
         self.encryptor = lib.encryption_init(key, n_threads)
         self.decryptor = lib.decryption_init(key, n_threads)
+
+
+class HTTPClient(Client):
+
+    def __init__(self, token, host='localhost', port=9000,
+                 n_threads=4):
+
+        self.n_threads = n_threads
+        self.token = token
+
+    @state_method('authenticate', 'download_files', 'download_via_http')
+    def download_via_http(self, url, file_id, processes, directory=None,
+                          print_stats=False):
+        if not directory:
+            directory = os.path.abspath(os.getcwd())
+        file_path = os.path.join(directory, file_id)
+        parallel_http_download(file_id, file_path)

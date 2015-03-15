@@ -198,46 +198,9 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                 total_sent, file_size))
 
 
-def parallel_http_download(client, url, file_id, processes, buffer_retries):
-
-    url = urlparse.urljoin(url, file_id)
-    log.info('Download request: {}'.format(url))
-
-    headers = construct_header(sthread.token)
-    try:
-        errors, size, file_name, status_code = make_file_request(url, headers)
-    except Exception as e:
-        sthread.send_json({'error': str(e)})
-        return str(e)
-
-
-    total_sent = 0
-    pool = Pool(processes)
-
-    blocks = []
-    while total_sent < file_size:
-        # Start new read
-        async_read = _read_map_async(url, headers, pool, processes,
-                                     RES_CHUNK_SIZE, total_sent,
-                                     file_size, buffer_retries)
-        # Write any data we got last round, waits for last send to complete
-        _send_async(sthread, blocks)
-        # Get more data while sending
-        blocks = async_read.get()
-        # Count the rest we just read
-        total_sent += sum([len(block) for block in blocks])
-
-    # Send last round of data
-    _send_async(sthread, blocks)
-    # Wait for send to complete and close the pool
-    sthread_join_send_thread(sthread)
-    pool.close()
-
-    # Check size
-    if total_sent != file_size:
-        raise RuntimeError(
-            'Proxy terminated prematurely: sent {} != {} expected'.format(
-                total_sent, file_size))
+def parallel_http_download(url, file_id, processes, verify=False,
+                           buffer_retries=4):
+    print 'download file', file_id
 
 
 def proxy_file_to_client(sthread, file_id, processes, verify=False,
