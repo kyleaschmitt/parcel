@@ -213,7 +213,7 @@ def parallel_http_download(url, token, file_id, file_path, processes,
         return str(e)
 
     if errors:
-        return str(errors)
+        return -1
 
     print_download_information(file_id, size, file_name, file_path)
 
@@ -238,6 +238,8 @@ def parallel_http_download(url, token, file_id, file_path, processes,
         raise RuntimeError(
             'Download terminated prematurely: sent {} != {} expected'.format(
                 total_sent, size))
+
+    return total_sent
 
 
 def proxy_file_to_client(sthread, file_id, processes, verify=False,
