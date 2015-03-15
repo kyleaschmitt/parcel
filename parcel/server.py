@@ -45,6 +45,8 @@ class Server(object):
 
         # Check server thread args
         assert 'data_server_url' in sthread_args
+        assert 'max_enc_threads' in sthread_args
+        assert 'buffer_processes' in sthread_args
 
         self.listen()
 

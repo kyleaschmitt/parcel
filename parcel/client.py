@@ -130,7 +130,7 @@ class Client(ParcelThread):
             raise RuntimeError('Not granted encryption threads {}'.format(
                 response['message']))
         else:
-            log.error('Encryption threads granted {}:'.format(
+            log.info('Encryption threads granted {}:'.format(
                 response['message']))
 
         self.encryptor = lib.encryption_init(key, n_threads)

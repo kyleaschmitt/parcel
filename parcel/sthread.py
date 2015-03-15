@@ -18,7 +18,8 @@ log = get_logger('sthread')
 
 class ServerThread(ParcelThread):
 
-    def __init__(self, instance, data_server_url, max_enc_threads):
+    def __init__(self, instance, data_server_url, max_enc_threads,
+                 buffer_processes):
         super(ServerThread, self).__init__(
             instance=instance,
             socket=lib.sthread_get_socket(instance),
@@ -30,6 +31,8 @@ class ServerThread(ParcelThread):
         self.handshake()
         self.authenticate()
 
+        # Set attributes
+        self.buffer_processes = buffer_processes
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
@@ -82,8 +85,8 @@ class ServerThread(ParcelThread):
         log.info('Thread exiting cleanly.')
         self.live = False
 
-    def proxy_file_to_client(self, file_id):
-        return proxy_file_to_client(self, file_id)
+    def proxy_file_to_client(self, *args, **kwargs):
+        return proxy_file_to_client(self, *args, **kwargs)
 
     @state_method('event_loop')
     def download(self):
@@ -98,7 +101,7 @@ class ServerThread(ParcelThread):
             raise
 
         try:
-            self.proxy_file_to_client(file_id)
+            self.proxy_file_to_client(file_id, self.buffer_processes)
         except Exception, e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
             raise
