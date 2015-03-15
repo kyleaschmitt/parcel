@@ -61,6 +61,7 @@ if __name__ == '__main__':
                             help='authentication token file')
     token_args.add_argument('-T', '--token', default='', type=str,
                             help='authentication token')
+    # Add token args
 
     #############################################################
     #                      HTTP options
@@ -73,6 +74,13 @@ if __name__ == '__main__':
                        help='Number of http .')
     https.add_argument('-u', '--url', required=True, type=str,
                        help='Download api url to append file_ids to')
+    # Add token args
+    token_args = https.add_mutually_exclusive_group(required=False)
+    token_args.add_argument('-t', '--token-file', default='', type=str,
+                            help='authentication token file')
+    token_args.add_argument('-T', '--token', default='', type=str,
+                            help='authentication token')
+    # Add token args
 
     #############################################################
     #                      General options
@@ -88,12 +96,6 @@ if __name__ == '__main__':
                         'Defaults to current dir')
     parser.add_argument('-x', '--no-stats', action='store_true',
                         help='turn off statistics printing')
-    # Add token args
-    token_args = parser.add_mutually_exclusive_group(required=False)
-    token_args.add_argument('-t', '--token-file', default='', type=str,
-                            help='authentication token file')
-    token_args.add_argument('-T', '--token', default='', type=str,
-                            help='authentication token')
 
     args = parser.parse_args()
 

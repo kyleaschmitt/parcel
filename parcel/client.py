@@ -32,7 +32,7 @@ class Client(ParcelThread):
             return
 
         for file_id in file_ids:
-            log.info('Found file id: {}'.format(file_id))
+            log.info('Given file id: {}'.format(file_id))
 
         for file_id in file_ids:
             start = time.time()
