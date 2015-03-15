@@ -18,7 +18,6 @@ and limitations under the License.
 #ifndef CRYPTO_H
 #define CRYPTO_H
 
-#define MAX_CRYPTO_THREADS 32
 #define USE_CRYPTO 1
 
 #define EVP_ENCRYPT 1

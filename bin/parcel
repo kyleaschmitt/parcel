@@ -36,6 +36,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dir', default=None,
                         help='Directory to download files to. '
                         'Defaults to current dir')
+    parser.add_argument('-x', '--no-stats', action='store_true',
+                        help='turn off statistics printing')
 
     # Add token args
     token_args = parser.add_mutually_exclusive_group(required=False)
@@ -65,4 +67,8 @@ if __name__ == '__main__':
     file_ids = [f['uuid'] for f in args.manifest] + args.file_ids
 
     # Download files to current directory
-    client.download_files(file_ids, directory=args.dir)
+    client.download_files(
+        file_ids,
+        directory=args.dir,
+        print_stats=(not args.no_stats)
+    )

@@ -152,6 +152,9 @@ class ServerThread(ParcelThread):
             raise RuntimeError(
                 'Unable to allocate encryption threads: {}'.format(
                     requested_threads))
+        else:
+            log.info('Granted request for {} threads'.format(
+                requested_threads))
 
         # Initialize Encryption
         self.encryptor = lib.encryption_init(key, requested_threads)

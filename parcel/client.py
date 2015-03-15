@@ -72,7 +72,7 @@ class Client(ParcelThread):
         self.send_control(CNTL_EXIT)
 
     @state_method('authenticate', 'download_files', 'download')
-    def download(self, file_id, directory=None):
+    def download(self, file_id, directory=None, print_stats=True):
         """Download steps:
 
         1. notify server of download state
@@ -103,11 +103,13 @@ class Client(ParcelThread):
             log.info('Downloading file to : {}'.format(file_path))
 
             # Download files
+            print_stats = 1 if print_stats else 0
             ss = lib.client_recv_file(
                 self.decryptor, self.instance, file_path, file_size,
-                RES_CHUNK_SIZE)
+                RES_CHUNK_SIZE, print_stats)
             if ss != file_size:
-                raise RuntimeError('Failed to download file.')
+                raise RuntimeError('File not completed {} != {}'.format(
+                    ss, file_size))
             log.info('Completed.')
         else:
             log.error('Unable to download file {}: {}'.format(
