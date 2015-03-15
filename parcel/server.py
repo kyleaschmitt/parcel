@@ -39,6 +39,10 @@ class Server(object):
         log.info('Server ready at {}:{}'.format(host, port))
         self.sthread_args = sthread_args
 
+        log.info('ServerThread args:')
+        for key, value in sthread_args.items():
+            log.info('|-- {}: {}'.format(key, value))
+
         # Check server thread args
         assert 'data_server_url' in sthread_args
 

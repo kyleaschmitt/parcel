@@ -1,5 +1,3 @@
-import json
-
 from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
@@ -20,7 +18,7 @@ log = get_logger('sthread')
 
 class ServerThread(ParcelThread):
 
-    def __init__(self, instance, data_server_url):
+    def __init__(self, instance, data_server_url, max_enc_threads):
         super(ServerThread, self).__init__(
             instance=instance,
             socket=lib.sthread_get_socket(instance),
@@ -28,12 +26,13 @@ class ServerThread(ParcelThread):
         )
 
         # Initialize thread
+        self.initialize_encryption('', max_enc_threads)
+        self.handshake()
+        self.authenticate()
+
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
-        self.initialize_encryption()
-        self.handshake()
-        self.authenticate()
 
         # Start thread processing
         while self.live:
@@ -51,9 +50,8 @@ class ServerThread(ParcelThread):
 
         self.send_control(CNTL_HANDSHAKE, encryption=False)
         self.recv_control(CNTL_HANDSHAKE, encryption=False)
-        client_option_str = self.next_payload()
         try:
-            client_options = json.loads(client_option_str)
+            client_options = self.read_json()
         except:
             log.error('Unable to process client options: {}'.format(
                 client_options))
@@ -92,16 +90,18 @@ class ServerThread(ParcelThread):
         """Proxy a file to the client
         """
         try:
-            file_request = json.loads(self.next_payload())
+            file_request = self.read_json()
             file_id = file_request['file_id']
         except Exception, e:
-            self.send_payload(json.dumps({
-                'error': 'Malformed file_request: {}'.format(str(e))}))
+            self.send_json({
+                'error': 'Malformed file_request: {}'.format(str(e))})
+            raise
 
         try:
             self.proxy_file_to_client(file_id)
         except Exception, e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
+            raise
 
     @state_method('authenticate', 'event_loop', 'download',
                   'initialize_encryption')
@@ -118,3 +118,38 @@ class ServerThread(ParcelThread):
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
         switch[cntl]()
+
+    @state_method(STATE_IDLE)
+    def initialize_encryption(self, key, max_threads):
+        key = str(range(256)).encode('hex')[:128]
+
+        # Get the encryption request
+        try:
+            log.info('Waiting for encryption request...')
+            client_request = self.read_json(encryption=False)
+            requested_threads = client_request['requested-encryption-threads']
+        except Exception, e:
+            self.send_json({
+                'error': 'Malformed file_request: {}'.format(str(e))
+            }, encryption=False)
+            raise
+
+        # Create response
+        response = {}
+        response['message'] = 'Server will provide threads 0-{}'.format(
+            max_threads)
+        if requested_threads <= max_threads and requested_threads > 0:
+            response['granted'] = True
+        else:
+            response['granted'] = False
+
+        # Respond
+        self.send_json(response, encryption=False)
+        if not response['granted']:
+            raise RuntimeError(
+                'Unable to allocate encryption threads: {}'.format(
+                    requested_threads))
+
+        # Initialize Encryption
+        self.encryptor = lib.encryption_init(key, requested_threads)
+        self.decryptor = lib.decryption_init(key, requested_threads)

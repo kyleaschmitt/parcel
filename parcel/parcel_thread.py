@@ -1,7 +1,7 @@
 from ctypes import create_string_buffer
 import atexit
-import signal
 from utils import state_method, vec
+import json
 
 from log import get_logger
 
@@ -16,8 +16,6 @@ from const import (
 
 from lib import lib
 
-# Signal handling for external calls
-signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Logging
 log = get_logger('parcel')
@@ -90,7 +88,7 @@ class ParcelThread(object):
         return payload_size
 
     def next_payload(self, **read_args):
-        payload_size = self.read_payload_size()
+        payload_size = self.read_payload_size(**read_args)
         return self.read_size(payload_size, **read_args)
 
     def send_payload(self, payload, size=None, **send_args):
@@ -112,12 +110,18 @@ class ParcelThread(object):
                 ord(cntl), ord(expected)))
         return cntl
 
+    def send_json(self, doc, **send_args):
+        payload = json.dumps(doc)
+        self.send_payload(payload, size=len(payload), **send_args)
+
+    def read_json(self, **read_args):
+        return json.loads(self.next_payload(**read_args))
+
     ############################################################
     #                     State Functions
     ############################################################
 
     def close(self):
-        self.send_control(CNTL_EXIT)
         self.close_func(self.instance)
 
     @state_method(STATE_IDLE)
@@ -127,9 +131,3 @@ class ParcelThread(object):
     @state_method('handshake')
     def authenticate(self, *args, **kwargs):
         raise NotImplementedError()
-
-    @state_method(STATE_IDLE)
-    def initialize_encryption(self):
-        key = str(range(256)).encode('hex')[:128]
-        self.encryptor = lib.encryption_init(key, 8)
-        self.decryptor = lib.decryption_init(key, 8)

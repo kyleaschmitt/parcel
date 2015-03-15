@@ -1,4 +1,3 @@
-import json
 import os
 
 from parcel_thread import ParcelThread
@@ -20,7 +19,7 @@ log = get_logger('client')
 
 class Client(ParcelThread):
 
-    def __init__(self, token, host='localhost', port=9000):
+    def __init__(self, token, host='localhost', port=9000, n_enc_threads=4):
         client = lib.new_client()
         log.info('Connecting to server at {}:{}'.format(host, port))
         lib.client_start(client, str(host), str(port))
@@ -29,7 +28,7 @@ class Client(ParcelThread):
             socket=lib.client_get_socket(client),
             close_func=lib.client_close,
         )
-        self.initialize_encryption()
+        self.initialize_encryption('', n_enc_threads)
         self.handshake()
         self.authenticate(token)
 
@@ -45,10 +44,10 @@ class Client(ParcelThread):
 
         self.send_control(CNTL_HANDSHAKE, encryption=False)
         self.recv_control(CNTL_HANDSHAKE, encryption=False)
-        self.send_payload(json.dumps({
+        self.send_json({
             'num_crypto_threads': 1,
             'version': 0.1,
-        }))
+        })
 
     @state_method('handshake')
     def authenticate(self, token):
@@ -70,6 +69,8 @@ class Client(ParcelThread):
         for file_id in file_ids:
             self.download(file_id, *args, **kwargs)
 
+        self.send_control(CNTL_EXIT)
+
     @state_method('authenticate', 'download_files', 'download')
     def download(self, file_id, directory=None):
         """Download steps:
@@ -81,9 +82,8 @@ class Client(ParcelThread):
 
         """
         self.send_control(CNTL_DOWNLOAD)
-        self.send_payload(json.dumps({
-            'file_id': file_id}))
-        file_info = json.loads(self.next_payload())
+        self.send_json({'file_id': file_id})
+        file_info = self.read_json()
 
         if not directory:
             directory = os.path.abspath(os.getcwd())
@@ -106,9 +106,32 @@ class Client(ParcelThread):
             ss = lib.client_recv_file(
                 self.decryptor, self.instance, file_path, file_size,
                 RES_CHUNK_SIZE)
-            if ss < 0:
+            if ss != file_size:
                 raise RuntimeError('Failed to download file.')
             log.info('Completed.')
         else:
             log.error('Unable to download file {}: {}'.format(
                 file_id, file_info['error']))
+
+    @state_method(STATE_IDLE)
+    def initialize_encryption(self, key, n_threads):
+        key = str(range(256)).encode('hex')[:128]
+
+        log.info('Requesting {} encryption threads'.format(n_threads))
+        self.send_json({
+            'requested-encryption-threads': n_threads
+        }, encryption=False)
+
+        log.info('Waiting for response...')
+        response = self.read_json(encryption=False)
+        if not response['granted']:
+            log.error('Encryption threads not granted {}:'.format(
+                response['message']))
+            raise RuntimeError('Not granted encryption threads {}'.format(
+                response['message']))
+        else:
+            log.error('Encryption threads granted {}:'.format(
+                response['message']))
+
+        self.encryptor = lib.encryption_init(key, n_threads)
+        self.decryptor = lib.decryption_init(key, n_threads)

@@ -14,7 +14,7 @@
 #include "crypto.h"
 
 #define BUFF_SIZE 67108864
-#define MSS 8000
+#define MSS 8400
 #define EXTERN extern "C"
 
 using namespace std;
@@ -276,7 +276,7 @@ EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int rs = read_data_no_encryption(socket, buff, len);
-    // decryptor->map_threaded(buff, buff, rs);
+    decryptor->map_threaded(buff, buff, rs);
     return rs;
 }
 
@@ -284,14 +284,14 @@ EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int rs = read_size_no_encryption(socket, buff, len);
-    // decryptor->map_threaded(buff, buff, rs);
+    decryptor->map_threaded(buff, buff, rs);
     return rs;
 }
 
 EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    // encryptor->map_threaded(buff, buff, len);
+    encryptor->map_threaded(buff, buff, len);
     int ss = send_data_no_encryption(socket, buff, len);
     return ss;
 }

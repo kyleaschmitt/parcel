@@ -16,6 +16,8 @@ if __name__ == '__main__':
                         help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
+    parser.add_argument('-n', '--max-threads', type=int, default=4,
+                        help='encryption threads to grant client')
     args = parser.parse_args()
 
     if args.verbose:
@@ -23,6 +25,7 @@ if __name__ == '__main__':
 
     sthread_args = {
         'data_server_url': args.data_server_url,
+        'max_enc_threads': args.max_threads,
     }
 
     server = parcel.Server()
