@@ -6,7 +6,7 @@ from lib import lib
 from log import get_logger
 from const import (
     # Lengths
-    LEN_CONTROL, LEN_PAYLOAD_SIZE, RES_CHUNK_SIZE,
+    RES_CHUNK_SIZE,
     # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     # States
@@ -19,18 +19,24 @@ log = get_logger('client')
 
 class Client(ParcelThread):
 
-    def __init__(self, token, host='localhost', port=9000, n_enc_threads=4):
-        client = lib.new_client()
-        log.info('Connecting to server at {}:{}'.format(host, port))
-        lib.client_start(client, str(host), str(port))
-        super(Client, self).__init__(
-            instance=client,
-            socket=lib.client_get_socket(client),
-            close_func=lib.client_close,
-        )
-        self.initialize_encryption('', n_enc_threads)
-        self.handshake()
-        self.authenticate(token)
+    def __init__(self, token, host='localhost', port=9000,
+                 n_enc_threads=4, parallel_http=False):
+
+        self.write_process = None
+        if parallel_http:
+            self.start_parallel_http_download(host, port, token)
+        else:
+            client = lib.new_client()
+            log.info('Connecting to server at {}:{}'.format(host, port))
+            lib.client_start(client, str(host), str(port))
+            super(Client, self).__init__(
+                instance=client,
+                socket=lib.client_get_socket(client),
+                close_func=lib.client_close,
+            )
+            self.initialize_encryption('', n_enc_threads)
+            self.handshake()
+            self.authenticate(token)
 
     @state_method('initialize_encryption')
     def handshake(self):
