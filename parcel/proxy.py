@@ -163,6 +163,10 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                 total_sent, file_size))
 
 
+def parallel_http_download(self):
+    pass
+
+
 def proxy_file_to_client(sthread, file_id, processes, verify=False):
 
     url = urlparse.urljoin(sthread.data_server_url, file_id)

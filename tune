@@ -14,3 +14,5 @@ sysctl -p /etc/sysctl.d/99.fasternet.conf
 
 ip link set dev eth0 mtu 9000
 ip link set dev eth0 qlen 10000
+ip link set dev lo mtu 9000
+ip link set dev lo qlen 10000
