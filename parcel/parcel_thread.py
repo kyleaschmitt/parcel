@@ -131,5 +131,5 @@ class ParcelThread(object):
     @state_method(STATE_IDLE)
     def initialize_encryption(self):
         key = str(range(256)).encode('hex')[:128]
-        self.encryptor = lib.encryption_init(key, 2)
-        self.decryptor = lib.decryption_init(key, 2)
+        self.encryptor = lib.encryption_init(key, 8)
+        self.decryptor = lib.decryption_init(key, 8)
