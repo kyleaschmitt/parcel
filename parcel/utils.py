@@ -36,7 +36,7 @@ def state_method(*states):
             self.state = func.__name__
             log.debug('{}: Entering state: {}'.format(self, self.state))
             try:
-                func(self, *args, **kwargs)
+                return func(self, *args, **kwargs)
             except KeyboardInterrupt:
                 log.error('KeyboardInterrupt in state {}'.format(self.state))
                 self.close()
