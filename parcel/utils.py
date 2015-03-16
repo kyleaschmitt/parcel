@@ -17,7 +17,7 @@ def get_pbar(title, maxval):
 
     """
     pbar = ProgressBar(widgets=[
-        title, Percentage(), ' ',
+        title, ' ',
         Bar(marker='#', left='[', right=']'), ' ',
         ETA(), ' ', FileTransferSpeed(), ' '], maxval=maxval)
     pbar.update(0)
@@ -25,11 +25,14 @@ def get_pbar(title, maxval):
 
 
 def monitor_transfer(client, file_id, total_size):
-    pbar = get_pbar('Downloading {}: '.format(file_id), total_size)
+    pbar = get_pbar('', total_size)
     time.sleep(1)
     while (lib.get_client_margs_live(client.instance)):
         downloaded = lib.get_client_margs_downloaded(client.instance)
-        pbar.update(downloaded)
+        try:
+            pbar.update(downloaded)
+        except:
+            pass
         time.sleep(1)
 
 
