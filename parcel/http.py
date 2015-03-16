@@ -135,9 +135,10 @@ def _read_range(args):
     except Exception as e:
         log.warn('Buffering error: {}'.format(str(e)))
         if retries > 0:
-            _read_range([url, headers, start, end, retries-1])
+            return _read_range([url, headers, start, end, retries-1])
         else:
-            log.error('Max buffer retries exceeded: {}'.format(retries))
+            raise RuntimeError('Max buffer retries exceeded: {}'.format(
+                retries))
 
     return r.content
 

@@ -2,7 +2,8 @@ import os
 import time
 
 from parcel_thread import ParcelThread
-from utils import state_method, print_download_information
+from threading import Thread
+from utils import state_method, print_download_information, monitor_transfer
 from lib import lib
 from log import get_logger
 from http import parallel_http_download
@@ -120,9 +121,17 @@ class UDTClient(Client):
 
         # Download files
         print_stats = 1 if print_stats else 0
+        monitor_thread = Thread(target=monitor_transfer,
+                                args=(self, file_id, file_size))
+        monitor_thread.start()
         ss = lib.client_recv_file(
             self.decryptor, self.instance, file_path, file_size,
             RES_CHUNK_SIZE, print_stats)
+        monitor_thread.join()
+
+        if ss < 0:
+            raise RuntimeError('Download failed')
+
         if ss != file_size:
             log.error('File not completed {} != {}'.format(
                 ss, file_size))

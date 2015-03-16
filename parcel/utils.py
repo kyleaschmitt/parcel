@@ -1,8 +1,36 @@
 from functools import wraps
+from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+
 from log import get_logger
+from lib import lib
+import time
 
 # Logging
 log = get_logger('util')
+
+
+def get_pbar(title, maxval):
+    """Create and initialize a custom progressbar
+
+    :param str title: The text of the progress bar
+    "param int maxva': The maximumum value of the progress bar
+
+    """
+    pbar = ProgressBar(widgets=[
+        title, Percentage(), ' ',
+        Bar(marker='#', left='[', right=']'), ' ',
+        ETA(), ' ', FileTransferSpeed(), ' '], maxval=maxval)
+    pbar.update(0)
+    return pbar
+
+
+def monitor_transfer(client, file_id, total_size):
+    pbar = get_pbar('Downloading {}: '.format(file_id), total_size)
+    time.sleep(1)
+    while (lib.get_client_margs_live(client.instance)):
+        downloaded = lib.get_client_margs_downloaded(client.instance)
+        pbar.update(downloaded)
+        time.sleep(1)
 
 
 def print_download_information(file_id, size, name, path):

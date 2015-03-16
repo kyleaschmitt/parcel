@@ -1,7 +1,7 @@
 import signal
 import os
 from ctypes import (
-    cdll, CFUNCTYPE, c_void_p, c_int, c_longlong
+    cdll, CFUNCTYPE, c_void_p, c_int, c_longlong, c_long
 )
 
 # Load library
@@ -79,6 +79,16 @@ class ParcelDLL(object):
         self.client_recv_file = _lib.client_recv_file
         self.client_recv_file.argtypes = (c_void_p, c_void_p, c_void_p, c_longlong, c_longlong, c_int)
         self.client_recv_file.restype = c_longlong
+
+        # int get_client_margs_live(Client *client)
+        self.get_client_margs_live = _lib.get_client_margs_live
+        self.get_client_margs_live.argtypes = (c_void_p,)
+        self.get_client_margs_live.restype = c_int
+
+        # int get_client_margs_downloaded(Client *client)
+        self.get_client_margs_downloaded = _lib.get_client_margs_downloaded
+        self.get_client_margs_downloaded.argtypes = (c_void_p,)
+        self.get_client_margs_downloaded.restype = c_longlong
 
 
 lib = ParcelDLL()

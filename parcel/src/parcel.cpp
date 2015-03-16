@@ -20,7 +20,7 @@
 using namespace std;
 
 typedef struct monitor_args {
-    int stop;
+    int live;
     int64_t downloaded;
     int64_t file_size;
     UDTSOCKET *s;
@@ -76,6 +76,7 @@ public:
     int udp_buff;
     int mss;
     UDTSOCKET client;
+    monitor_args margs;
 
     Client();
     int close();
@@ -388,40 +389,33 @@ EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
                                   char *path, int64_t size,
                                   int64_t block_size, int print_stats)
 {
+
     char *buffer = new char[block_size];
     fstream ofs(path, ios::out | ios::binary | ios::trunc);
     int64_t total_read = 0;
-    pthread_t mon_thread;
-    monitor_args margs;
-
-    if (print_stats){
-        margs.s = &client->client;
-        margs.stop = 0;
-        margs.downloaded = 0;
-        margs.file_size = size;
-        pthread_create(&mon_thread, NULL, monitor, &margs);
-    }
+    client->margs.downloaded = 0;
+    client->margs.live = 1;
 
     while (total_read < size){
-        int this_size = min(size-total_read, block_size);
+        int64_t this_size = min(size-total_read, block_size);
         int rs = read_size(decryptor, client->client, buffer, this_size);
         if (rs < 0){
+            cerr << "Unable to write to file: " << path << endl;
+            return rs;
+        }
+        if (!ofs.write(buffer, rs)){
+            cerr << "Unable to write to file: " << path << endl;
             return -1;
         }
-        ofs.write(buffer, this_size);
         total_read += rs;
         if (print_stats){
-            margs.downloaded = total_read;
+            client->margs.downloaded = total_read;
         }
     }
 
     ofs.close();
     delete buffer;
-
-    if (print_stats){
-        margs.stop = 1;
-        pthread_join(mon_thread, NULL);
-    }
+    client->margs.live = 0;
 
     return total_read;
 }
@@ -430,7 +424,7 @@ void* monitor(void* _arg)
 {
     monitor_args *margs = (monitor_args*)_arg;
     UDT::TRACEINFO perf;
-    while (!margs->stop) {
+    while (margs->live) {
         sleep(1);
         if (UDT::ERROR == UDT::perfmon(*margs->s, &perf)) {
             cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
@@ -450,4 +444,12 @@ void* monitor(void* _arg)
     }
     cerr << endl;
     return NULL;
+}
+
+EXTERN int get_client_margs_live(Client *client){
+    return client->margs.live;
+}
+
+EXTERN int64_t get_client_margs_downloaded(Client *client){
+    return client->margs.downloaded;
 }
