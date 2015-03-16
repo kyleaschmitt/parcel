@@ -1,17 +1,17 @@
 C++ = g++
 
-CCFLAGS = -Wall -D$(os) -I../udt/src -finline-functions -g\
+CCFLAGS = -Wall -D$(os) -I../../udt/src -finline-functions -g\
 	 -lcrypto -lopenssl -D_LARGE_FILE_SOURCE=1 -fPIC
 LINK_FLAGS = -shared -Wl,-soname,lparcel.so
 DIR = $(shell pwd)
-INSTALL_PATH = '/usr/local/lib'
+INSTALL_PATH = /usr/local/lib
 APP = parcel
 APPOUT = parcel
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
 so_path := $(abspath $(dir mkfile_path))/lparcel.so
 LIBS = -lssl -lcrypto -ludt
-LDFLAGS = -L../udt/src -lstdc++ -lpthread -lm -g
+LDFLAGS = -L../../udt/src -lstdc++ -lpthread -lm -g
 
 ifndef os
    os = LINUX
@@ -58,7 +58,7 @@ clean:
 
 install:
 	export PATH=$(DIR):$$PATH
-	cp lparcel.so libudt.so $(INSTALL_PATH)/
+	cp lparcel.so $(INSTALL_PATH)/
 
 uninstall:
-	rm $(INSTALL_PATH)/lparcel.so $(INSTALL_PATH)/libudt.so
+	rm $(INSTALL_PATH)/lparcel.so

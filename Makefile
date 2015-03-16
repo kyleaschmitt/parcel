@@ -1,10 +1,21 @@
-DIRS = parcel
-TARGETS = all clean install uninstall
+INSTALL_DIR = /usr/local/lib
 
-$(TARGETS): %: $(patsubst %, %.%, $(DIRS))
+all:
+	make -C udt
+	make install -C udt
+	make -C parcel
+
+parcel: all
 
 udt:
-	make -C parcel/udt
+	make -C udt
 
-$(foreach TGT, $(TARGETS), $(patsubst %, %.$(TGT), $(DIRS))):
-	$(MAKE) -C $(subst ., , $@)
+install:
+	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
+	sudo cp parcel/src/lparcel.so $(INSTALL_DIR)/lparcel.so
+
+clean:
+	make clean -C udt
+	make clean -C parcel
+
+.PHONY: install

@@ -32,6 +32,7 @@ endif
 
 OBJS = api.o buffer.o cache.o ccc.o channel.o common.o core.o epoll.o list.o md5.o packet.o queue.o window.o
 DIR = $(shell pwd)
+INSTALL_DIR = /usr/local/lib
 
 all: libudt.a libudt.so udt
 
@@ -41,7 +42,6 @@ all: libudt.a libudt.so udt
 libudt.so: $(OBJS)
 ifneq ($(os), OSX)
 	$(C++) -shared -o $@ $^
-	cp libudt.so libudt.a ../../src
 else
 	$(C++) -dynamiclib -o libudt.dylib -lstdc++ -lpthread -lm $^
 endif
@@ -56,5 +56,5 @@ clean:
 	rm -f *.o *.so *.dylib *.a udt
 
 install:
-	export LD_LIBRARY_PATH=$(DIR):$$LD_LIBRARY_PATH
-	sudo cp libudt.so /usr/local/lib/libudt.so
+	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
+	sudo cp libudt.so $(INSTALL_DIR)/libudt.so
