@@ -57,3 +57,4 @@ clean:
 
 install:
 	export LD_LIBRARY_PATH=$(DIR):$$LD_LIBRARY_PATH
+	sudo cp libudt.so /usr/local/lib/libudt.so

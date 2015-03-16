@@ -1,8 +1,12 @@
 #!/bin/bash
 
 echo 'Building libraries...'
-sudo make install -I parcel/udt/src/
-make
+cd parcel/udt
+sudo make
+cd ../src
+sudo make
+sudo make install
+python setup.py
 echo 'Installing libraries to /usr/local/lib'
 sudo make install
 echo 'Installing python package'

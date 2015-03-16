@@ -4,7 +4,7 @@ setup(
     name='parcel',
     packages=["parcel"],
     install_requires=[
-        'requests==2.5.1',
+        'requests',
     ],
     scripts=[
         'bin/parcel',
