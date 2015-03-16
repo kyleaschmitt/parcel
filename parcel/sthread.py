@@ -1,3 +1,5 @@
+import atexit
+
 from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
@@ -34,6 +36,8 @@ class ServerThread(ParcelThread):
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
+
+        atexit.register(self.close)
 
         # Start thread processing
         while self.live:

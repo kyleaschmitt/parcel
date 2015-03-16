@@ -28,12 +28,12 @@ def monitor_transfer(client, file_id, total_size):
     pbar = get_pbar('File: {}'.format(file_id), total_size)
     time.sleep(1)
     while (lib.get_client_margs_live(client.instance)):
-        downloaded = lib.get_client_margs_downloaded(client.instance)
         try:
-            pbar.update(downloaded)
+            pbar.update(lib.get_client_margs_downloaded(client.instance))
         except:
             pass
         time.sleep(1)
+    pbar.finish()
 
 
 def print_download_information(file_id, size, name, path):

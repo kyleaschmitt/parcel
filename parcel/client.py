@@ -1,8 +1,9 @@
 import os
 import time
+import atexit
 
 from parcel_thread import ParcelThread
-from threading import Thread
+from multiprocessing.pool import ThreadPool
 from utils import state_method, print_download_information, monitor_transfer
 from lib import lib
 from log import get_logger
@@ -64,6 +65,7 @@ class UDTClient(Client):
         self.initialize_encryption('', n_threads)
         self.handshake()
         self.authenticate()
+        atexit.register(self.close)
 
     @state_method('initialize_encryption')
     def handshake(self):
@@ -123,19 +125,19 @@ class UDTClient(Client):
         print_stats = 1 if print_stats else 0
         args = (self.decryptor, self.instance, file_path, file_size,
                 RES_CHUNK_SIZE, print_stats)
-        recv_thread = Thread(target=lib.client_recv_file, args=args)
-        recv_thread.start()
+        pool = ThreadPool(processes=1)
+        async_recv = pool.apply_async(lib.client_recv_file, args)
+
         monitor_transfer(self, file_id, file_size)
-        recv_thread.join()
+        ss = async_recv.get()
+        if ss < 0:
+            raise RuntimeError('Download failed')
 
-        # if ss < 0:
-        #     raise RuntimeError('Download failed')
-
-        # if ss != file_size:
-        #     log.error('File not completed {} != {}'.format(
-        #         ss, file_size))
-        #     return -1
-        # return ss
+        if ss != file_size:
+            log.error('File not completed {} != {}'.format(
+                ss, file_size))
+            return -1
+        return ss
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self, key, n_threads):

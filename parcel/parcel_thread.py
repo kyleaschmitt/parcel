@@ -1,5 +1,4 @@
 from ctypes import create_string_buffer
-import atexit
 from utils import state_method, vec
 import json
 
@@ -31,7 +30,6 @@ class ParcelThread(object):
         self.state = STATE_IDLE
         self.encryptor = None
         self.decryptor = None
-        atexit.register(self.close)
         self.instance = instance
         self.socket = socket
         self.close_func = close_func
