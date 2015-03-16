@@ -403,7 +403,7 @@ EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
     }
 
     while (total_read < size){
-        int64_t this_size = min(size-total_read, block_size);
+        int this_size = min(size-total_read, block_size);
         int rs = read_size(decryptor, client->client, buffer, this_size);
         if (rs < 0){
             return -1;
@@ -414,6 +414,7 @@ EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
             margs.downloaded = total_read;
         }
     }
+
     ofs.close();
     delete buffer;
 
@@ -442,7 +443,7 @@ void* monitor(void* _arg)
         cerr <<  "Gbps: " << perf.mbpsRecvRate/1e3;
         cerr.width(8);
         cerr.setf( std::ios::fixed, std:: ios::floatfield );
-        cerr << "\tGB: " << margs->downloaded/1e9/8;
+        cerr << "\tGB: " << margs->downloaded/1e9;
         cerr.width(18);
         cerr << "File: " << margs->downloaded*100/margs->file_size << " %";
         cerr << "\r";
