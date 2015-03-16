@@ -1,3 +1,8 @@
+*/udt.h
+*/libudt.a
+*/libudt.so
+*/lparcel.so
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
