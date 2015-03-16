@@ -36,8 +36,10 @@ UDT (UDP Based Data transfer) is a reliable application level protocol for trans
 ## Installation
 
 To install both the server and the client, simply run (preferrably in a python virtual environment):
+```
 ❯ cd parcel
-❯ ./install parcel
+❯ ./install
+```
 
 ## Tests
 
