@@ -1,7 +1,7 @@
-*/udt.h
-*/libudt.a
-*/libudt.so
-*/lparcel.so
+parcel/src/udt.h
+*.a
+*.so
+*.so
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
