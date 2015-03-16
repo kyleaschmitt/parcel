@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo 'Building libraries...'
+sudo make install -I parcel/udt/src/
 make
 echo 'Installing libraries to /usr/local/lib'
 sudo make install

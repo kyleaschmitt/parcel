@@ -99,8 +99,6 @@ int main(int argc, char* argv[])
    int size = 10;
    // char* data = new char[size];
 
-   char* data = "TEST TEST TEST TEST";
-
 
    #ifndef WIN32
       pthread_create(new pthread_t, NULL, monitor, &client);
@@ -108,24 +106,24 @@ int main(int argc, char* argv[])
       CreateThread(NULL, 0, monitor, &client, 0, NULL);
    #endif
 
-   for (int i = 0; i < 1000000; i ++)
-   {
-      int ssize = 0;
-      int ss;
-      while (ssize < size)
-      {
-         if (UDT::ERROR == (ss = UDT::send(client, data + ssize, size - ssize, 0)))
-         {
-            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
-            break;
-         }
+   // for (int i = 0; i < 1000000; i ++)
+   // {
+   //    int ssize = 0;
+   //    int ss;
+   //    while (ssize < size)
+   //    {
+   //       if (UDT::ERROR == (ss = UDT::send(client, data + ssize, size - ssize, 0)))
+   //       {
+   //          cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+   //          break;
+   //       }
 
-         ssize += ss;
-      }
+   //       ssize += ss;
+   //    }
 
-      if (ssize < size)
-         break;
-   }
+   //    if (ssize < size)
+   //       break;
+   // }
 
    UDT::close(client);
    // delete [] data;
