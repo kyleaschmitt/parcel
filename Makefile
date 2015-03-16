@@ -14,8 +14,11 @@ install:
 	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
 	sudo cp parcel/src/lparcel.so $(INSTALL_DIR)/lparcel.so
 
+uninstall:
+	sudo rm $(INSTALL_DIR)/lparcel.so
+
 clean:
 	make clean -C udt
 	make clean -C parcel
 
-.PHONY: install
+.PHONY: install uninstall

@@ -1,8 +1,6 @@
 #!/bin/bash
 
-echo 'Building libraries...'
-make -C udt
-sudo -C make isntall udt
-make parcel
-sudo make install parcel
+set -e
+make
+make install
 sudo $(which python) setup.py install
