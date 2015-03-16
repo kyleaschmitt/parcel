@@ -45,7 +45,7 @@ ifeq ($(os), SUNOS)
    LDFLAGS += -lrt -lsocket
 endif
 
-all: $(APP)
+all: parcel
 
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c -static
@@ -54,11 +54,11 @@ parcel: parcel.o crypto.o
 	$(C++) $(LINK_FLAGS) -o $(so_path) $(INSTALL_PATH)/libudt.so parcel.o crypto.o $(LIBS)
 
 clean:
-	rm -f *.o parcel.so
+	rm -f *.o lparcel.so parcel.a libudt.so
 
 install:
 	export PATH=$(DIR):$$PATH
-	cp lparcel.so $(INSTALL_PATH)/
+	cp lparcel.so $(INSTALL_PATH)/lparcel.so
 
 uninstall:
 	rm $(INSTALL_PATH)/lparcel.so

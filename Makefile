@@ -12,10 +12,10 @@ udt:
 
 install:
 	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
-	sudo cp parcel/src/lparcel.so $(INSTALL_DIR)/lparcel.so
+	make install -C parcel
 
 uninstall:
-	sudo rm $(INSTALL_DIR)/lparcel.so
+	make uninstall -C parcel
 
 clean:
 	make clean -C udt
