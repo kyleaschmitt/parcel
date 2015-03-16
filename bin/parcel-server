@@ -3,7 +3,22 @@ import parcel
 import argparse
 import logging
 
+
 logging.root.setLevel(logging.INFO)
+
+
+def main(args):
+    if args.verbose:
+        logging.root.setLevel(logging.DEBUG)
+
+    sthread_args = {
+        'data_server_url': args.data_server_url,
+        'max_enc_threads': args.max_threads,
+        'buffer_processes': args.buffer_processes,
+    }
+
+    server = parcel.Server()
+    server.start(host=args.host, port=args.port, sthread_args=sthread_args)
 
 
 if __name__ == '__main__':
@@ -22,14 +37,4 @@ if __name__ == '__main__':
                         help='Number of processes to use for async buffering from API')
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.root.setLevel(logging.DEBUG)
-
-    sthread_args = {
-        'data_server_url': args.data_server_url,
-        'max_enc_threads': args.max_threads,
-        'buffer_processes': args.buffer_processes,
-    }
-
-    server = parcel.Server()
-    server.start(host=args.host, port=args.port, sthread_args=sthread_args)
+    main(args)

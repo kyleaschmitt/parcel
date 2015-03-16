@@ -133,7 +133,7 @@ def _read_range(args):
         assert len(r.content) == size, '{} != {}'.format(
             len(r.content), size)
     except Exception as e:
-        log.error('Buffering error: {}'.format(str(e)))
+        log.warn('Buffering error: {}'.format(str(e)))
         if retries > 0:
             _read_range([url, headers, start, end, retries-1])
         else:
