@@ -115,5 +115,4 @@ if __name__ == '__main__':
     client.download_files(
         file_ids,
         directory=args.dir,
-        print_stats=(not args.no_stats)
     )

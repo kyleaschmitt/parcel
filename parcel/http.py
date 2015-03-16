@@ -212,7 +212,7 @@ def parallel_http_download(url, token, file_id, directory, processes,
         errors, size, file_name, status_code = make_file_request(url, headers)
     except Exception as e:
         log.error(str(e))
-        return str(e)
+        return -1
 
     if errors:
         return -1

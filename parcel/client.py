@@ -40,7 +40,7 @@ class Client(ParcelThread):
             file_size = self.download_file(file_id, *args, **kwargs)
             stop = time.time()
             if file_size > 0:
-                rate = (file_size*8/1e9) / (stop - start)
+                rate = (int(file_size)*8/1e9) / (stop - start)
                 log.info(
                     'Download complete: {0:.2f} Gbps average'.format(rate))
 
