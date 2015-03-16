@@ -55,13 +55,22 @@ if __name__ == '__main__':
                      help='parcel server port')
     udt.add_argument('-i', '--host', default='localhost', type=str,
                      help='parcel server port')
+    udt.add_argument('-m', '--manifest', type=manifest.argparse_type,
+                     default=list(),
+                     help='GDC Download manifest file.')
+    udt.add_argument('-v', '--verbose', action='store_true',
+                     help='verbose logging')
+    udt.add_argument('-d', '--dir', default=None,
+                     help='Directory to download files to. '
+                     'Defaults to current dir')
+    udt.add_argument('-x', '--no-stats', action='store_true',
+                     help='turn off statistics printing')
     # Add token args
     token_args = udt.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,
                             help='authentication token file')
     token_args.add_argument('-T', '--token', default='', type=str,
                             help='authentication token')
-    # Add token args
 
     #############################################################
     #                      HTTP options
@@ -74,6 +83,14 @@ if __name__ == '__main__':
                        help='Number of http .')
     https.add_argument('-u', '--url', required=True, type=str,
                        help='Download api url to append file_ids to')
+    https.add_argument('-m', '--manifest', type=manifest.argparse_type,
+                       default=list(),
+                       help='GDC Download manifest file.')
+    https.add_argument('-v', '--verbose', action='store_true',
+                       help='verbose logging')
+    https.add_argument('-d', '--dir', default=None,
+                       help='Directory to download files to. '
+                       'Defaults to current dir')
     # Add token args
     token_args = https.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,
@@ -81,21 +98,6 @@ if __name__ == '__main__':
     token_args.add_argument('-T', '--token', default='', type=str,
                             help='authentication token')
     # Add token args
-
-    #############################################################
-    #                      General options
-    #############################################################
-
-    parser.add_argument('-m', '--manifest', type=manifest.argparse_type,
-                        default=list(),
-                        help='GDC Download manifest file.')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='verbose logging')
-    parser.add_argument('-d', '--dir', default=None,
-                        help='Directory to download files to. '
-                        'Defaults to current dir')
-    parser.add_argument('-x', '--no-stats', action='store_true',
-                        help='turn off statistics printing')
 
     args = parser.parse_args()
 
@@ -107,7 +109,7 @@ if __name__ == '__main__':
     client = get_client(args, token)
 
     # Create file list
-    file_ids = [f['uuid'] for f in args.manifest] + args.file_ids
+    file_ids = [f['id'] for f in args.manifest]+args.file_ids
 
     # Download files to current directory
     client.download_files(
