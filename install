@@ -3,4 +3,4 @@
 set -e
 make
 make install
-sudo $(which python) setup.py install
+sudo -E $(which python) setup.py install
