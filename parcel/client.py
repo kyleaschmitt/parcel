@@ -121,22 +121,21 @@ class UDTClient(Client):
 
         # Download files
         print_stats = 1 if print_stats else 0
-        monitor_thread = Thread(target=monitor_transfer,
-                                args=(self, file_id, file_size))
-        monitor_thread.start()
-        ss = lib.client_recv_file(
-            self.decryptor, self.instance, file_path, file_size,
-            RES_CHUNK_SIZE, print_stats)
-        monitor_thread.join()
+        args = (self.decryptor, self.instance, file_path, file_size,
+                RES_CHUNK_SIZE, print_stats)
+        recv_thread = Thread(target=lib.client_recv_file, args=args)
+        recv_thread.start()
+        monitor_transfer(self, file_id, file_size)
+        recv_thread.join()
 
-        if ss < 0:
-            raise RuntimeError('Download failed')
+        # if ss < 0:
+        #     raise RuntimeError('Download failed')
 
-        if ss != file_size:
-            log.error('File not completed {} != {}'.format(
-                ss, file_size))
-            return -1
-        return ss
+        # if ss != file_size:
+        #     log.error('File not completed {} != {}'.format(
+        #         ss, file_size))
+        #     return -1
+        # return ss
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self, key, n_threads):

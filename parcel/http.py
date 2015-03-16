@@ -6,7 +6,7 @@ import os
 
 from log import get_logger
 from const import RES_CHUNK_SIZE
-from utils import print_download_information
+from utils import print_download_information, get_pbar
 
 # Logging
 log = get_logger()
@@ -224,6 +224,8 @@ def parallel_http_download(url, token, file_id, directory, processes,
     pool = Pool(processes)
     f = open(file_path, 'wb')
 
+    pbar = get_pbar('File: {}'.format(file_id), size)
+
     blocks = []
     while total_sent < size:
         # Start new read
@@ -236,12 +238,14 @@ def parallel_http_download(url, token, file_id, directory, processes,
         blocks = async_read.get()
         # Count the rest we just read
         total_sent += sum([len(block) for block in blocks])
+        pbar.update(total_sent)
 
     for block in blocks:
         f.write(block)
 
     pool.close()
     f.close()
+    pbar.finish()
 
     # Check size
     if total_sent != size:

@@ -25,7 +25,7 @@ def get_pbar(title, maxval):
 
 
 def monitor_transfer(client, file_id, total_size):
-    pbar = get_pbar('', total_size)
+    pbar = get_pbar('File: {}'.format(file_id), total_size)
     time.sleep(1)
     while (lib.get_client_margs_live(client.instance)):
         downloaded = lib.get_client_margs_downloaded(client.instance)
