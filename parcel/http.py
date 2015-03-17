@@ -123,6 +123,8 @@ def _read_range(args):
     headers['Range'] = 'bytes={}-{}'.format(start, end)
     # provide host because it's mandatory
     headers['host'] = host
+    size = end - start + 1  # the range is inclusive of upper bound
+
     try:
         # Get data
         log.debug('Reading range: {}'.format(headers.get('Range')))
@@ -130,9 +132,10 @@ def _read_range(args):
 
         # Check data
         r.raise_for_status()
-        size = end - start + 1  # the range is inclusive of upper bound
-        assert len(r.content) == size, '{} != {}'.format(
-            len(r.content), size)
+        content = r.content
+        r.close()
+        assert len(content) == size, '{} != {}'.format(
+            len(content), size)
     except Exception as e:
         log.warn('Buffering error: {}'.format(str(e)))
         if retries > 0:
@@ -141,7 +144,7 @@ def _read_range(args):
             raise RuntimeError('Max buffer retries exceeded: {}'.format(
                 retries))
 
-    return r.content
+    return content
 
 
 def _read_map_async(url, headers, pool, pool_size, block_size, start,
