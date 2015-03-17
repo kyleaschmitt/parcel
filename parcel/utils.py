@@ -17,7 +17,7 @@ def get_pbar(title, maxval):
 
     """
     pbar = ProgressBar(widgets=[
-        title, ' ',
+        title, Percentage(), ' ',
         Bar(marker='#', left='[', right=']'), ' ',
         ETA(), ' ', FileTransferSpeed(), ' '], maxval=maxval)
     pbar.update(0)

@@ -160,7 +160,8 @@ def _read_map_async(url, headers, pool, pool_size, block_size, start,
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
-                                 processes, buffer_retries):
+                                 processes, buffer_retries,
+                                 block_size=RES_CHUNK_SIZE):
     """Buffer and send
 
     1. async buffer get in parallel
@@ -179,7 +180,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
     while total_sent < file_size:
         # Start new read
         async_read = _read_map_async(url, headers, pool, processes,
-                                     RES_CHUNK_SIZE, total_sent,
+                                     block_size, total_sent,
                                      file_size, buffer_retries)
         # Write any data we got last round, waits for last send to complete
         _send_async(sthread, blocks)
@@ -202,7 +203,8 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
 
 
 def parallel_http_download(url, token, file_id, directory, processes,
-                           verify=False, buffer_retries=4):
+                           verify=False, buffer_retries=4,
+                           block_size=RES_CHUNK_SIZE):
 
     url = urlparse.urljoin(url, file_id)
 
@@ -230,7 +232,7 @@ def parallel_http_download(url, token, file_id, directory, processes,
     while total_sent < size:
         # Start new read
         async_read = _read_map_async(url, headers, pool, processes,
-                                     RES_CHUNK_SIZE, total_sent,
+                                     block_size, total_sent,
                                      size, buffer_retries)
         for block in blocks:
             f.write(block)
