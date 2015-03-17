@@ -13,7 +13,6 @@ log = get_logger('parcel_client')
 
 
 def parse_host(server):
-    print urlparse(server)
     s, n, path, param, q, f = urlparse(server)
     split = path.split(':')
     host = split.pop(0)

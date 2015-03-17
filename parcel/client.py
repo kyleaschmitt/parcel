@@ -174,9 +174,12 @@ class HTTPClient(Client):
         self.socket = None
 
     @state_method('download_files', 'download_file', STATE_IDLE)
-    def download_file(self, file_id, directory=None, print_stats=False):
+    def download_file(self, file_id, directory=None,
+                      print_stats=False, block_size=RES_CHUNK_SIZE):
         if not directory:
             directory = os.path.abspath(os.getcwd())
-        file_size = parallel_http_download(self.url, self.token, file_id,
-                                           directory, self.n_processes)
+        file_size = parallel_http_download(self.url, self.token,
+                                           file_id, directory,
+                                           self.n_processes,
+                                           block_size=block_size)
         return file_size
