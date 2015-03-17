@@ -28,6 +28,7 @@ def get_client(args, token):
             host=host,
             port=port,
             n_threads=args.n_threads,
+            pubkey=args.pubkey,
         )
     elif args.mode == 'http':
         client = parcel.HTTPClient(
@@ -93,6 +94,15 @@ if __name__ == '__main__':
                      'Defaults to current dir')
     udt.add_argument('-x', '--no-stats', action='store_true',
                      help='turn off statistics printing')
+
+    # Server public key options.
+    udt.add_argument('-K', '--keyfile',
+        dest='pubkey',
+        default=None,
+        type=lambda x: argparse.FileType('r')(x).read(),
+        help='Server RSA public key file.',
+    )
+
     # Add token args
     token_args = udt.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,

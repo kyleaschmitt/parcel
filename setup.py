@@ -6,6 +6,7 @@ setup(
     install_requires=[
         'requests',
         'progressbar==2.2',
+        'pycrypto==2.6.1',
     ],
     scripts=[
         'bin/parcel',
