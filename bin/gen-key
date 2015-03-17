@@ -1,0 +1,14 @@
+#!/usr/bin/env python2
+
+import Crypto
+from Crypto.PublicKey import RSA
+from Crypto import Random
+
+KEY_LENGTH = 4096
+random_gen = Random.new().read
+
+key = RSA.generate(KEY_LENGTH, random_gen)
+pub = key.publickey()
+
+print(key.exportKey())
+print(pub.exportKey())

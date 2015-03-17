@@ -1,5 +1,6 @@
 import atexit
 
+from parcel import auth
 from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
@@ -19,23 +20,28 @@ log = get_logger('sthread')
 class ServerThread(ParcelThread):
 
     def __init__(self, instance, data_server_url, max_enc_threads,
-                 buffer_processes):
+                 buffer_processes, prikey=None):
         super(ServerThread, self).__init__(
             instance=instance,
             socket=lib.sthread_get_socket(instance),
             close_func=lib.sthread_close,
         )
 
-        # Initialize thread
-        self.initialize_encryption('', max_enc_threads)
-        self.handshake()
-        self.authenticate()
-
         # Set attributes
         self.buffer_processes = buffer_processes
         self.data_server_url = data_server_url
         self.live = True
         self.send_thread = None
+
+        # Encryption attributes
+        self.prikey = prikey
+        self.key = None
+        self.iv = None
+
+        # Initialize thread
+        self.initialize_encryption('', max_enc_threads)
+        self.handshake()
+        self.authenticate()
 
         atexit.register(self.close)
 
@@ -73,7 +79,14 @@ class ServerThread(ParcelThread):
         """Authentication stub
 
         """
-
+        if self.prikey: # Server private key specified - perform exchange.
+            self.key, self.iv = auth.server_auth(
+                self.send_payload,
+                self.next_payload,
+                self.key,
+                encryption=False,
+            )
+        # TODO need to move token passing to after encryption has been enabled
         self.token = self.next_payload()
         if self.token:
             log.info('Connected with token.')
@@ -97,14 +110,14 @@ class ServerThread(ParcelThread):
         try:
             file_request = self.read_json()
             file_id = file_request['file_id']
-        except Exception, e:
+        except Exception as e:
             self.send_json({
                 'error': 'Malformed file_request: {}'.format(str(e))})
             raise
 
         try:
             self.proxy_file_to_client(file_id, self.buffer_processes)
-        except Exception, e:
+        except Exception as e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
             raise
 
@@ -133,7 +146,7 @@ class ServerThread(ParcelThread):
             log.info('Waiting for encryption request...')
             client_request = self.read_json(encryption=False)
             requested_threads = client_request['requested-encryption-threads']
-        except Exception, e:
+        except Exception as e:
             self.send_json({
                 'error': 'Malformed file_request: {}'.format(str(e))
             }, encryption=False)
