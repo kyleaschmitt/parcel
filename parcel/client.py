@@ -49,10 +49,14 @@ class Client(ParcelThread):
 class UDTClient(Client):
 
     def __init__(self, token, host='localhost', port=9000,
-                 n_threads=4):
+                 n_threads=4, pubkey=None):
 
         self.n_threads = n_threads
         self.token = token
+
+        self.pubkey = None
+        self.key = None
+        self.iv = None
 
         client = lib.new_client()
         log.info('Connecting to server at {}:{}'.format(host, port))
@@ -86,6 +90,14 @@ class UDTClient(Client):
 
     @state_method('handshake')
     def authenticate(self):
+        if self.pubkey: # Server public key specified - perform exchange.
+            self.key, self.iv = auth.client_auth(
+                self.send_payload,
+                self.next_payload,
+                self.key,
+                encryption=False,
+            )
+        # TODO need to move token passing to after encryption has been enabled
         self.send_payload(self.token)
 
     def close(self):
