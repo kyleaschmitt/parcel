@@ -80,10 +80,11 @@ class ServerThread(ParcelThread):
 
         """
         if self.prikey: # Server private key specified - perform exchange.
+            log.info('Performing pubkey handshake.')
             self.key, self.iv = auth.server_auth(
                 self.send_payload,
                 self.next_payload,
-                self.key,
+                self.prikey,
                 encryption=False,
             )
         # TODO need to move token passing to after encryption has been enabled
