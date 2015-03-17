@@ -68,9 +68,11 @@ class ParcelThread(object):
             size = len(data)
         if encryption:
             self.assert_encryption()
-            lib.send_data(self.encryptor, self.socket, to_send, size)
+            ss = lib.send_data(self.encryptor, self.socket, to_send, size)
         else:
-            lib.send_data_no_encryption(self.socket, to_send, size)
+            ss = lib.send_data_no_encryption(self.socket, to_send, size)
+        if ss != size:
+            raise RuntimeError('Unable to write to socket.')
 
     ############################################################
     #                     Transfer Functions

@@ -125,6 +125,7 @@ def _read_range(args):
     headers['host'] = host
     try:
         # Get data
+        log.debug('Reading range: {}'.format(headers.get('Range')))
         r = requests.get(url, headers=headers, verify=False)
 
         # Check data
@@ -183,13 +184,16 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
                                      block_size, total_sent,
                                      file_size, buffer_retries)
         # Write any data we got last round, waits for last send to complete
+        log.debug('Writing {} bytes'.format(sum(map(len, blocks))))
         _send_async(sthread, blocks)
         # Get more data while sending
+        log.debug('Joining async read')
         blocks = async_read.get()
         # Count the rest we just read
         total_sent += sum([len(block) for block in blocks])
 
     # Send last round of data
+    log.debug('Writing last {} bytes'.format(sum(map(len, blocks))))
     _send_async(sthread, blocks)
     # Wait for send to complete and close the pool
     sthread_join_send_thread(sthread)
@@ -225,7 +229,6 @@ def parallel_http_download(url, token, file_id, directory, processes,
     total_sent = 0
     pool = Pool(processes)
     f = open(file_path, 'wb')
-
     pbar = get_pbar('File: {}'.format(file_id), size)
 
     blocks = []
@@ -234,14 +237,17 @@ def parallel_http_download(url, token, file_id, directory, processes,
         async_read = _read_map_async(url, headers, pool, processes,
                                      block_size, total_sent,
                                      size, buffer_retries)
+        log.debug('Writing {} bytes'.format(sum(map(len, blocks))))
         for block in blocks:
             f.write(block)
         # Get more data while sending
+        log.debug('Joining async read')
         blocks = async_read.get()
         # Count the rest we just read
         total_sent += sum([len(block) for block in blocks])
         pbar.update(total_sent)
 
+    log.debug('Writing last {} bytes'.format(sum(map(len, blocks))))
     for block in blocks:
         f.write(block)
 
