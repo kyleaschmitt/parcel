@@ -2,6 +2,7 @@
 import argparse
 import parcel
 import logging
+from urlparse import urlparse
 
 from parcel import manifest
 from parcel.log import get_logger
@@ -11,18 +12,28 @@ logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
 
 
+def parse_host(server):
+    print urlparse(server)
+    s, n, path, param, q, f = urlparse(server)
+    split = path.split(':')
+    host = split.pop(0)
+    port = split.pop(0) if split else 9000
+    return host, port
+
+
 def get_client(args, token):
     if args.mode == 'udt':
+        host, port = parse_host(args.server.pop(0))
         client = parcel.UDTClient(
             token,
-            host=args.host,
-            port=args.port,
+            host=host,
+            port=port,
             n_threads=args.n_threads,
         )
-    elif args.mode == 'https':
+    elif args.mode == 'http':
         client = parcel.HTTPClient(
             token,
-            url=args.url,
+            url=args.server.pop(0),
             n_processes=args.n_processes,
         )
     else:
@@ -37,9 +48,29 @@ def load_token(args):
     else:
         return args.token
 
+
+def main(args):
+
+    # Set verbosty
+    if args.verbose:
+        logging.root.setLevel(logging.DEBUG)
+
+    token = load_token(args)
+    client = get_client(args, token)
+
+    # Create file list
+    file_ids = [f['id'] for f in args.manifest]+args.file_ids
+
+    # Download files to current directory
+    client.download_files(
+        file_ids,
+        directory=args.dir,
+    )
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='Download using UDT or HTTPS',
+    subparsers = parser.add_subparsers(help='Download using UDT or HTTP',
                                        dest='mode')
 
     #############################################################
@@ -47,14 +78,12 @@ if __name__ == '__main__':
     #############################################################
 
     udt = subparsers.add_parser('udt', help='Download files via UDT')
+    udt.add_argument('server', metavar='server', type=str, nargs=1,
+                     help='The parcel server udt address server[:port]')
     udt.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
                      help='uuids to download')
     udt.add_argument('-n', '--n-threads', type=int, default=4,
                      help='Number of encryption/http threads.')
-    udt.add_argument('-p', '--port', default=9000, type=str,
-                     help='parcel server port')
-    udt.add_argument('-i', '--host', default='localhost', type=str,
-                     help='parcel server port')
     udt.add_argument('-m', '--manifest', type=manifest.argparse_type,
                      default=list(),
                      help='GDC Download manifest file.')
@@ -76,23 +105,23 @@ if __name__ == '__main__':
     #                      HTTP options
     #############################################################
 
-    https = subparsers.add_parser('https', help='Download files via HTTPS')
-    https.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
-                       help='uuids to download')
-    https.add_argument('-n', '--n-processes', type=int, default=4,
-                       help='Number of http .')
-    https.add_argument('-u', '--url', required=True, type=str,
-                       help='Download api url to append file_ids to')
-    https.add_argument('-m', '--manifest', type=manifest.argparse_type,
-                       default=list(),
-                       help='GDC Download manifest file.')
-    https.add_argument('-v', '--verbose', action='store_true',
-                       help='verbose logging')
-    https.add_argument('-d', '--dir', default=None,
-                       help='Directory to download files to. '
-                       'Defaults to current dir')
+    http = subparsers.add_parser('http', help='Download files via HTTP')
+    http.add_argument('server', metavar='server', type=str, nargs=1,
+                      help='The http server address server[:port]')
+    http.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
+                      help='uuids to download')
+    http.add_argument('-n', '--n-processes', type=int, default=4,
+                      help='Number of http .')
+    http.add_argument('-m', '--manifest', type=manifest.argparse_type,
+                      default=list(),
+                      help='GDC Download manifest file.')
+    http.add_argument('-v', '--verbose', action='store_true',
+                      help='verbose logging')
+    http.add_argument('-d', '--dir', default=None,
+                      help='Directory to download files to. '
+                      'Defaults to current dir')
     # Add token args
-    token_args = https.add_mutually_exclusive_group(required=False)
+    token_args = http.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default='', type=str,
                             help='authentication token file')
     token_args.add_argument('-T', '--token', default='', type=str,
@@ -100,19 +129,4 @@ if __name__ == '__main__':
     # Add token args
 
     args = parser.parse_args()
-
-    # Set verbosty
-    if args.verbose:
-        logging.root.setLevel(logging.DEBUG)
-
-    token = load_token(args)
-    client = get_client(args, token)
-
-    # Create file list
-    file_ids = [f['id'] for f in args.manifest]+args.file_ids
-
-    # Download files to current directory
-    client.download_files(
-        file_ids,
-        directory=args.dir,
-    )
+    main(args)
