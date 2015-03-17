@@ -176,6 +176,7 @@ class HTTPClient(Client):
     @state_method('download_files', 'download_file', STATE_IDLE)
     def download_file(self, file_id, directory=None,
                       print_stats=False, block_size=RES_CHUNK_SIZE):
+
         if not directory:
             directory = os.path.abspath(os.getcwd())
         file_size = parallel_http_download(self.url, self.token,

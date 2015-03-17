@@ -247,7 +247,7 @@ EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size)
         // Check for errors
         if (UDT::ERROR == ss){
             cerr << "send:" << UDT::getlasterror().getErrorMessage() << endl;
-            break;
+            return -1;
         }
         // Increment the amount sent before repeating
         ssize += ss;
