@@ -12,7 +12,7 @@ def main(args):
         logging.root.setLevel(logging.DEBUG)
 
     sthread_args = {
-        'data_server_url': args.data_server_url,
+        'data_server_url': args.server.pop(0),
         'max_enc_threads': args.max_threads,
         'buffer_processes': args.buffer_processes,
     }
@@ -23,8 +23,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--data-server-url', required=True, type=str,
-                        help='location of data server')
+    parser.add_argument('server', metavar='server', type=str, nargs=1,
+                        help='The url path of the data server')
     parser.add_argument('-p', '--port', default=9000, type=int,
                         help='parcel server port')
     parser.add_argument('-i', '--host', default='localhost', type=str,
