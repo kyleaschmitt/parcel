@@ -3,10 +3,11 @@ import requests
 from threading import Thread
 from multiprocessing.pool import Pool
 import os
+from math import ceil
 
 from log import get_logger
 from const import RES_CHUNK_SIZE
-from utils import print_download_information, get_pbar
+from utils import print_download_information
 
 # Logging
 log = get_logger()
@@ -14,6 +15,32 @@ try:
     requests.packages.urllib3.disable_warnings()
 except Exception as e:
     log.error('Unable to silence requests warnings: {}'.format(str(e)))
+
+
+####################################################################
+#                            Util functions
+####################################################################
+
+
+def _check_transfer_size(actual, expected):
+    if actual != expected:
+        raise ValueError(
+            'Transfer size incorrect: {} != {} expected'.format(
+                actual, expected))
+
+
+def write_offest(path, data, offset):
+    f = open(path, 'r+b')
+    f.seek(offset)
+    f.write(data)
+    f.close()
+
+
+def set_file_length(path, length):
+    f = open(path, 'wb')
+    f.seek(length-1)
+    f.write('\0')
+    f.close()
 
 
 def distribute(start, stop, block):
@@ -24,10 +51,39 @@ def distribute(start, stop, block):
     return [(a, min(stop, a+block)-1) for a in range(start, stop, block)]
 
 
-def construct_header(token):
+def add_range_to_header(url, header, start, end):
+    # parse url for host
+    scheme, host, path, params, q, frag = urlparse.urlparse(url)
+    header = {key: value for key, value in header.items()}
+    header['Range'] = 'bytes={}-{}'.format(start, end)
+    # provide host because it's mandatory, range request doesn't work otherwise
+    header['host'] = host
+    return header
+
+
+def construct_header(token, start=None, end=None):
     return {
         'X-Auth-Token': token,
     }
+
+
+def _check_status_code(r, url):
+    """Handle an un/successful requests.
+
+    If unsuccessful, return errors. Return of NoneType means
+    success. This is atypical but useful.
+
+    """
+    if r.status_code != 200:
+        msg = 'Request failed: ERROR {}: {}'.format(
+            r.status_code, r.text.replace('\n', ''))
+        log.error(str(msg))
+        return msg
+    return None
+
+####################################################################
+#                          SThread functions
+####################################################################
 
 
 def make_file_request(url, headers, verify=False):
@@ -44,21 +100,6 @@ def make_file_request(url, headers, verify=False):
     size, file_name = _parse_file_header(r, url)
     r.close()
     return errors, size, file_name, r.status_code
-
-
-def _check_status_code(r, url):
-    """Handle an un/successful requests.
-
-    If unsuccessful, return errors. Return of NoneType means
-    success. This is atypical but useful.
-
-    """
-    if r.status_code != 200:
-        msg = 'Request failed: ERROR {}: {}'.format(
-            r.status_code, r.text.replace('\n', ''))
-        log.error(str(msg))
-        return msg
-    return None
 
 
 def _parse_file_header(r, url):
@@ -117,17 +158,13 @@ def _send_async(sthread, blocks):
 
 def _read_range(args):
     url, headers, start, end, retries = args
-    # parse url for host
-    scheme, host, path, params, q, frag = urlparse.urlparse(url)
     # specify range
-    headers['Range'] = 'bytes={}-{}'.format(start, end)
-    # provide host because it's mandatory, range request doesn't work otherwise
-    headers['host'] = host
+    headers = add_range_to_header(url, headers, start, end)
     size = end - start + 1  # the range is inclusive of upper bound
 
     try:
         # Get data
-        log.debug('\nReading range: [{}]'.format(headers.get('Range')))
+        log.debug('Reading range: [{}]'.format(headers.get('Range')))
         r = requests.get(url, headers=headers, verify=False)
 
         # Check data
@@ -161,34 +198,6 @@ def _read_map_async(url, headers, pool, pool_size, block_size, start,
     args = [[url, headers, beg, end, retries] for beg, end in ranges]
     # Async read from data server. Return handler, call .get() later
     return pool.map_async(_read_range, args)
-
-
-def write_offest(path, data, offset):
-    f = open(path, 'r+b')
-    f.seek(offset)
-    f.write(data)
-    f.close()
-
-
-def set_file_length(path, length):
-    f = open(path, 'wb')
-    f.seek(length-1)
-    f.write('\0')
-    f.close()
-
-
-def _read_write_range(args):
-    path, url, headers, start, end, retries = args
-    content = _read_range((url, headers, start, end, retries))
-    write_offest(path, content, start)
-    return len(content)
-
-
-def _check_file_size(actual, expected):
-    if actual != expected:
-        raise RuntimeError(
-            'Proxy terminated prematurely: sent {} != {} expected'.format(
-                actual, expected))
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
@@ -229,39 +238,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
     # Wait for send to complete and close the pool
     sthread_join_send_thread(sthread)
     pool.close()
-    _check_file_size(file_size, total_sent)
-
-
-def parallel_http_download(url, token, file_id, directory, processes,
-                           verify=False, buffer_retries=4,
-                           block_size=RES_CHUNK_SIZE):
-
-    url = urlparse.urljoin(url, file_id)
-    headers = construct_header(token)
-    try:
-        log.info('Request to {} to url'.format(url))
-        errors, size, file_name, status_code = make_file_request(url, headers)
-    except Exception as e:
-        log.error(str(e))
-        return -1
-
-    if errors:
-        return -1
-
-    file_path = os.path.join(directory, '{}.{}'.format(file_id, file_name))
-    print_download_information(file_id, size, file_name, file_path)
-    set_file_length(file_path, size)
-    pool = Pool(processes)
-    # Get range for each process in pool
-    ranges = distribute(0, size, block_size)
-    # Create args for each process
-    args = [[file_path, url, headers, beg, end, buffer_retries]
-            for beg, end in ranges]
-    total_sent = sum(pool.map(_read_write_range, args))
-    pool.close()
-    _check_file_size(size, total_sent)
-
-    return total_sent
+    _check_transfer_size(file_size, total_sent)
 
 
 def proxy_file_to_client(sthread, file_id, processes, verify=False,
@@ -290,3 +267,75 @@ def proxy_file_to_client(sthread, file_id, processes, verify=False,
                                      processes, buffer_retries)
 
     return None
+
+
+####################################################################
+#                        HTTPClient functions
+####################################################################
+
+
+def _read_write_range(path, url, headers, start, end):
+    headers = add_range_to_header(url, headers, start, end)
+    log.debug('Reading range: [{}]'.format(headers.get('Range')))
+    r = requests.get(url, headers=headers, verify=False, stream=True)
+    offset = start
+    total_written = 0
+    # Then streaming of the data itself.
+    for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
+        if not chunk:
+            continue  # Empty are keep-alives.
+        write_offest(path, chunk, offset)
+        offset += len(chunk)
+        total_written += len(chunk)
+
+    return total_written
+
+
+def _try_retry_read_write_range(args):
+    path, url, headers, start, end, retries = args
+    try:
+        written = _read_write_range(path, url, headers, start, end)
+        _check_transfer_size(end-start+1, written)  # range is inclusive
+    except ValueError as e:
+        log.warn('Buffering error: {}'.format(str(e)))
+        if retries > 0:
+            return _try_retry_read_write_range(
+                [path, url, headers, start, end, retries-1])
+        else:
+            raise RuntimeError('Max buffer retries exceeded: {}'.format(
+                retries))
+    return written
+
+
+def parallel_http_download(url, token, file_id, directory, processes,
+                           verify=False, buffer_retries=4,
+                           block_size=RES_CHUNK_SIZE):
+
+    url = urlparse.urljoin(url, file_id)
+    headers = construct_header(token)
+    try:
+        log.info('Request to {} to url'.format(url))
+        errors, size, file_name, status_code = make_file_request(url, headers)
+    except Exception as e:
+        log.error(str(e))
+        return -1
+
+    if errors:
+        return -1
+
+    file_path = os.path.join(directory, '{}.{}'.format(file_id, file_name))
+    print_download_information(file_id, size, file_name, file_path)
+    set_file_length(file_path, size)
+    pool = Pool(processes)
+    # Get range for each process in pool
+    block_size = int(ceil(float(size)/processes))
+    ranges = distribute(0, size, block_size)
+
+    # Create args for each process
+    args = [[file_path, url, headers, beg, end, buffer_retries]
+            for beg, end in ranges]
+    total_sent = sum(pool.map(_try_retry_read_write_range, args))
+    pool.close()
+    _check_transfer_size(size, total_sent)
+
+    return total_sent
