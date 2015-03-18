@@ -1,6 +1,7 @@
 from functools import wraps
 from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
 
+from const import GB
 from log import get_logger
 from lib import lib
 import time
@@ -41,7 +42,8 @@ def print_download_information(file_id, size, name, path):
     log.info('Starting download   : {}'.format(file_id))
     log.info('-'*40)
     log.info('File name           : {}'.format(name))
-    log.info('Download size       : {}'.format(size))
+    log.info('Download size       : {} B ({:.2f} GB)'.format(
+        size, (size / float(GB))))
     log.info('Downloading file to : {}'.format(path))
 
 
