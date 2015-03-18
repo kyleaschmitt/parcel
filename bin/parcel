@@ -125,7 +125,6 @@ if __name__ == '__main__':
                             help='authentication token file')
     token_args.add_argument('-T', '--token', default='', type=str,
                             help='authentication token')
-    # Add token args
 
     args = parser.parse_args()
     main(args)

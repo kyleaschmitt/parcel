@@ -121,13 +121,13 @@ def _read_range(args):
     scheme, host, path, params, q, frag = urlparse.urlparse(url)
     # specify range
     headers['Range'] = 'bytes={}-{}'.format(start, end)
-    # provide host because it's mandatory
+    # provide host because it's mandatory, range request doesn't work otherwise
     headers['host'] = host
     size = end - start + 1  # the range is inclusive of upper bound
 
     try:
         # Get data
-        log.debug('Reading range: {}'.format(headers.get('Range')))
+        log.debug('\nReading range: [{}]'.format(headers.get('Range')))
         r = requests.get(url, headers=headers, verify=False)
 
         # Check data
@@ -161,6 +161,34 @@ def _read_map_async(url, headers, pool, pool_size, block_size, start,
     args = [[url, headers, beg, end, retries] for beg, end in ranges]
     # Async read from data server. Return handler, call .get() later
     return pool.map_async(_read_range, args)
+
+
+def write_offest(path, data, offset):
+    f = open(path, 'r+b')
+    f.seek(offset)
+    f.write(data)
+    f.close()
+
+
+def set_file_length(path, length):
+    f = open(path, 'wb')
+    f.seek(length-1)
+    f.write('\0')
+    f.close()
+
+
+def _read_write_range(args):
+    path, url, headers, start, end, retries = args
+    content = _read_range((url, headers, start, end, retries))
+    write_offest(path, content, start)
+    return len(content)
+
+
+def _check_file_size(actual, expected):
+    if actual != expected:
+        raise RuntimeError(
+            'Proxy terminated prematurely: sent {} != {} expected'.format(
+                actual, expected))
 
 
 def _async_stream_data_to_client(sthread, url, file_size, headers,
@@ -201,12 +229,7 @@ def _async_stream_data_to_client(sthread, url, file_size, headers,
     # Wait for send to complete and close the pool
     sthread_join_send_thread(sthread)
     pool.close()
-
-    # Check size
-    if total_sent != file_size:
-        raise RuntimeError(
-            'Proxy terminated prematurely: sent {} != {} expected'.format(
-                total_sent, file_size))
+    _check_file_size(file_size, total_sent)
 
 
 def parallel_http_download(url, token, file_id, directory, processes,
@@ -214,7 +237,6 @@ def parallel_http_download(url, token, file_id, directory, processes,
                            block_size=RES_CHUNK_SIZE):
 
     url = urlparse.urljoin(url, file_id)
-
     headers = construct_header(token)
     try:
         log.info('Request to {} to url'.format(url))
@@ -228,41 +250,16 @@ def parallel_http_download(url, token, file_id, directory, processes,
 
     file_path = os.path.join(directory, '{}.{}'.format(file_id, file_name))
     print_download_information(file_id, size, file_name, file_path)
-
-    total_sent = 0
+    set_file_length(file_path, size)
     pool = Pool(processes)
-    f = open(file_path, 'wb')
-    pbar = get_pbar('File: {}'.format(file_id), size)
-
-    blocks = []
-    while total_sent < size:
-        # Start new read
-        async_read = _read_map_async(url, headers, pool, processes,
-                                     block_size, total_sent,
-                                     size, buffer_retries)
-        log.debug('Writing {} bytes'.format(sum(map(len, blocks))))
-        for block in blocks:
-            f.write(block)
-        # Get more data while sending
-        log.debug('Joining async read')
-        blocks = async_read.get()
-        # Count the rest we just read
-        total_sent += sum([len(block) for block in blocks])
-        pbar.update(total_sent)
-
-    log.debug('Writing last {} bytes'.format(sum(map(len, blocks))))
-    for block in blocks:
-        f.write(block)
-
+    # Get range for each process in pool
+    ranges = distribute(0, size, block_size)
+    # Create args for each process
+    args = [[file_path, url, headers, beg, end, buffer_retries]
+            for beg, end in ranges]
+    total_sent = sum(pool.map(_read_write_range, args))
     pool.close()
-    f.close()
-    pbar.finish()
-
-    # Check size
-    if total_sent != size:
-        raise RuntimeError(
-            'Download terminated prematurely: sent {} != {} expected'.format(
-                total_sent, size))
+    _check_file_size(size, total_sent)
 
     return total_sent
 
