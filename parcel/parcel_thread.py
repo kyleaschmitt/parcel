@@ -13,9 +13,8 @@ from const import (
     # States
     STATE_IDLE,
 )
-from utils import (
-    distribute, parse_file_header
-)
+from utils import calculate_segments
+
 from lib import lib
 import requests
 
@@ -143,7 +142,7 @@ class ParcelThread(object):
 
     def split_file(self, size, blocks):
         block_size = int(ceil(float(size)/blocks))
-        segments = distribute(0, size, block_size)
+        segments = calculate_segments(0, size, block_size)
         return segments, block_size
 
     ############################################################
@@ -151,21 +150,22 @@ class ParcelThread(object):
     ############################################################
 
     def request_file_information(self):
-        url = urlparse.urljoin(self.uri, self.file_id)
         headers = self.construct_header()
-        log.info('Request to {}'.format(url))
-        size, name = self.make_file_request(url, headers)
+        r = self.make_file_request(headers, close=True)
+        size, name = self.parse_file_header(r, self.file_id)
         return name, size
 
-    def make_file_request(self, url, headers, verify=False):
+    def make_file_request(self, headers, verify=False, close=False):
         """Make request for file, just get the header.
 
         """
+        url = urlparse.urljoin(self.uri, self.file_id)
+        log.debug('Request to {}'.format(url))
         r = requests.get(url, headers=headers, verify=verify, stream=True)
-        self.check_status_code(r, url)
-        size, file_name = parse_file_header(r, url)
-        r.close()
-        return size, file_name
+        r.raise_for_status()
+        if close:
+            r.close()
+        return r
 
     def construct_header(self):
         return {
@@ -176,22 +176,10 @@ class ParcelThread(object):
         header = self.construct_header()
         header['Range'] = 'bytes={}-{}'.format(start, end)
         # provide host because it's mandatory, range request
-        # doesn't work otherwise
+        # may not work otherwise
         scheme, host, path, params, q, frag = urlparse.urlparse(self.uri)
         header['host'] = host
         return header
-
-    def check_status_code(self, r, url):
-        """Handle an un/successful requests.
-
-        If unsuccessful, return errors. Return of NoneType means
-        success. This is atypical but useful.
-
-        """
-        if r.status_code != 200:
-            msg = 'Request failed: ERROR {}: {}'.format(
-                r.status_code, r.text.replace('\n', ''))
-            raise RuntimeError(msg)
 
     def read_range_to_file(self, path, url, headers, start, end):
         headers = self.construct_header_with_range(start, end)
@@ -212,3 +200,38 @@ class ParcelThread(object):
             raise ValueError(
                 'Transfer size incorrect: {} != {} expected'.format(
                     actual, expected))
+
+    def parse_ranges(self, ranges):
+        """Validate an HTTP ranges, throwing an exception if it isn't something
+        we support.
+
+        """
+        ranges = ranges.strip()
+        unit, nums = ranges.split("=")
+        if unit != "bytes":
+            raise RuntimeError(
+                "Only byte rangess are supported, not {}".format(unit))
+        begin, end = nums.split("-")
+        begin, end = int(begin), int(end)
+        if end < begin:
+            raise ValueError("bad range: {}".format(ranges))
+        return begin, end
+
+    def parse_file_header(self, r, url):
+        """Send a header to the client.
+
+        :returns: The file size and name
+        """
+
+        # Client assumes a metadata response first.
+        try:
+            size = long(r.headers['Content-Length'])
+            log.info('Request responded: {} bytes'.format(size))
+        except KeyError:
+            msg = 'Request without length: {}'.format(url)
+            log.error(msg)
+
+        attachment = r.headers.get('content-disposition', None)
+        file_name = attachment.split('filename=')[-1] if attachment else None
+
+        return size, file_name

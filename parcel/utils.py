@@ -5,9 +5,7 @@ from const import GB
 from log import get_logger
 from lib import lib
 import time
-import urlparse
 import requests
-from const import HTTP_CHUNK_SIZE, RES_CHUNK_SIZE
 
 # Logging
 log = get_logger('utils')
@@ -88,27 +86,6 @@ def state_method(*states):
     return wrapper
 
 
-def parse_ranges(ranges):
-    """Validate an HTTP ranges, throwing an exception if it isn't something
-    we support. For now we only support things of the form bytes={begin}-{end}
-
-    """
-    try:
-        ranges = ranges.strip()
-        unit, nums = ranges.split("=")
-        if unit != "bytes":
-            raise RuntimeError(
-                "Only byte rangess are supported, not {}".format(unit))
-        begin, end = nums.split("-")
-        begin, end = int(begin), int(end)
-        if end < begin:
-            raise RuntimeError("impossible ranges: {}".format(ranges))
-        else:
-            return begin, end
-    except ValueError:
-        raise RuntimeError("Malformed ranges: {}".format(ranges))
-
-
 def write_offset(path, data, offset):
     f = open(path, 'r+b')
     f.seek(offset)
@@ -123,64 +100,9 @@ def set_file_length(path, length):
     f.close()
 
 
-def distribute(start, stop, block):
+def calculate_segments(start, stop, block):
     """return a list of blocks in sizes no larger than `block`, the last
     block can be smaller.
 
     """
     return [(a, min(stop, a+block)-1) for a in range(start, stop, block)]
-
-
-def parse_file_header(r, url):
-    """Send a header to the client.
-
-    :returns: The file size and name
-    """
-
-    # Client assumes a metadata response first.
-    try:
-        size = long(r.headers['Content-Length'])
-        log.info('Request responded: {} bytes'.format(size))
-    except KeyError:
-        msg = 'Request without length: {}'.format(url)
-        log.error(msg)
-
-    attachment = r.headers.get('content-disposition', None)
-    file_name = attachment.split('filename=')[-1] if attachment else None
-
-    return size, file_name
-
-
-def read_write_range(path, url, headers, start, end, q):
-    headers = add_range_to_header(url, headers, start, end)
-    log.debug('Reading range: [{}]'.format(headers.get('Range')))
-    r = requests.get(url, headers=headers, verify=False, stream=True)
-    offset = start
-    total_written = 0
-    # Then streaming of the data itself.
-    for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
-        if not chunk:
-            continue  # Empty are keep-alives.
-        write_offset(path, chunk, offset)
-        written = len(chunk)
-        offset += written
-        total_written += written
-        q.put(written)
-
-    return total_written
-
-
-def try_retry_read_write_range(args):
-    path, url, headers, start, end, retries, q = args
-    try:
-        written = read_write_range(path, url, headers, start, end, q)
-        check_transfer_size(end-start+1, written)  # range is inclusive
-    except ValueError as e:
-        log.warn('Buffering error: {}'.format(str(e)))
-        if retries > 0:
-            return try_retry_read_write_range(
-                [path, url, headers, start, end, retries-1, q])
-        else:
-            raise RuntimeError('Max buffer retries exceeded: {}'.format(
-                retries))
-    return written
