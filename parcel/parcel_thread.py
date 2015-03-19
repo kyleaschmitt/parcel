@@ -4,6 +4,7 @@ import json
 from math import ceil
 import urlparse
 from log import get_logger
+from requests.exceptions import HTTPError
 
 from const import (
     # Lengths
@@ -97,6 +98,7 @@ class ParcelThread(object):
         return self.read_size(payload_size, **read_args)
 
     def send_payload(self, payload, size=None, **send_args):
+        payload = (payload+'\0')[:-1]
         if size is None:
             size = len(payload)
         self.send_payload_size(size, **send_args)
@@ -155,7 +157,7 @@ class ParcelThread(object):
 
     def request_file_information(self, file_id):
         headers = self.construct_header()
-        r = self.make_file_request(headers, close=True)
+        r = self.make_file_request(file_id, headers, close=True)
         size, name = self.parse_file_header(r, file_id)
         return name, size
 
@@ -166,7 +168,10 @@ class ParcelThread(object):
         url = urlparse.urljoin(self.uri, file_id)
         log.debug('Request to {}'.format(url))
         r = requests.get(url, headers=headers, verify=verify, stream=True)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except HTTPError as e:
+            raise HTTPError('{}: {}'.format(str(e), r.text))
         if close:
             r.close()
         return r
