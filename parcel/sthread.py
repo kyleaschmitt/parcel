@@ -11,9 +11,6 @@ from const import (
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
     STATE_IDLE, RES_CHUNK_SIZE
 )
-from utils import (
-    parse_ranges
-)
 
 # Logging
 log = get_logger('sthread')

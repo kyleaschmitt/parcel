@@ -1,7 +1,5 @@
 import time
 import os
-import urlparse
-from math import ceil
 from multiprocessing.pool import Pool
 from multiprocessing import Manager
 from parcel_thread import ParcelThread
@@ -9,13 +7,16 @@ from parcel_thread import ParcelThread
 from log import get_logger
 from const import STATE_IDLE, RES_CHUNK_SIZE
 from utils import (
-    print_download_information,
-    set_file_length, distribute, try_retry_read_write_range,
-    get_pbar, state_method
+    print_download_information, set_file_length, get_pbar, state_method
 )
 
 # Logging
 log = get_logger('client')
+
+
+def download_worker(args):
+    client, path, segment = args
+    client.try_retry_read_write_segment(path, segment)
 
 
 class Client(ParcelThread):
@@ -75,7 +76,7 @@ class Client(ParcelThread):
         for file_id in file_ids:
             log.info('Given file id: {}'.format(file_id))
 
-        # Downlaod each file
+        # Download each file
         for file_id in file_ids:
             self.download_file(file_id)
 
@@ -86,7 +87,7 @@ class Client(ParcelThread):
         file_size = self.parallel_download(block_size=block_size)
         return file_size
 
-    def segment_init(self, start, end, *args, **kwargs):
+    def get_segment_iterator(self, start, end, *args, **kwargs):
         raise NotImplementedError()
 
     def segment_download(self, path, start, stop, *args, **kwargs):
@@ -94,17 +95,13 @@ class Client(ParcelThread):
 
     def parallel_download(self, verify=False, buffer_retries=4,
                           block_size=RES_CHUNK_SIZE):
-        manager = Manager()
-        q = manager.Queue()
 
         name, size = self.request_file_information()
         path = self.get_file_path(name)
-        segments, block_size = self.split_file(size, self.n_procs)
-
+        segments, block_size = self.split_file(size, self.n_procs*4)
         self.initialize_file_download(name, path, size)
-        responses = map(self.segment_init, segments)
-
-        # Get range for each process in pool
-        total_received = 0
+        args = ((self, path, segment) for segment in segments)
+        pool = Pool(self.n_procs)
+        total_received = sum(pool.map(download_worker, args))
         self.finalize_file_download(size, total_received)
         return total_received
