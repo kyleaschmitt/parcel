@@ -4,6 +4,7 @@ import logging
 import os
 from parcel import manifest, HTTPClient, UDTClient
 from parcel.log import get_logger
+from parcel.auth import generate_keypair
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
@@ -11,9 +12,10 @@ log = get_logger('parcel_client')
 
 def get_client(args, token):
     if args.mode == 'udt':
+        private_key, public_key = generate_keypair()
         return UDTClient(
             args.server.pop(0), token, args.n_processes,
-            args.dir, args.server_public_key)
+            args.dir, args.server_public_key, private_key, public_key)
     elif args.mode == 'http':
         return HTTPClient(
             args.server.pop(0), token, args.n_processes, args.dir)

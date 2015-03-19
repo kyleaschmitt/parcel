@@ -97,8 +97,9 @@ class ParcelThread(object):
         payload_size = self.read_payload_size(**read_args)
         return self.read_size(payload_size, **read_args)
 
-    def send_payload(self, payload, size=None, **send_args):
-        payload = (payload+'\0')[:-1]
+    def send_payload(self, payload, size=None, inplace=False, **send_args):
+        if not inplace:
+            payload = (payload+'\0')[:-1]
         if size is None:
             size = len(payload)
         self.send_payload_size(size, **send_args)
