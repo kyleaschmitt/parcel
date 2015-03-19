@@ -482,7 +482,7 @@ EXTERN ThreadedEncryption *encryption_init(char *key, char *iv)
     return new ThreadedEncryption(EVP_ENCRYPT,
                                   (unsigned char*)key,
                                   (unsigned char*)iv,
-                                  0);
+                                  1);
 }
 
 EXTERN ThreadedEncryption *decryption_init(char *key, char *iv)
@@ -490,5 +490,5 @@ EXTERN ThreadedEncryption *decryption_init(char *key, char *iv)
     return new ThreadedEncryption(EVP_DECRYPT,
                                   (unsigned char*)key,
                                   (unsigned char*)iv,
-                                  0);
+                                  1);
 }

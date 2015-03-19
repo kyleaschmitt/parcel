@@ -50,6 +50,7 @@ ThreadedEncryption::ThreadedEncryption(int _direction,
     // EVP setup
     for (int i = 0; i < n_threads; i++){
         memset(ivec, 0, 1024);
+        memcpy(ivec, _iv, 16);
         EVP_CIPHER_CTX_init(&ctx[i]);
         // Set encryption scheme
         if (!EVP_CipherInit_ex(&ctx[i], cipher, NULL, _key, ivec, _direction)) {

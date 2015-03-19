@@ -12,7 +12,8 @@ log = get_logger('parcel_client')
 def get_client(args, token):
     if args.mode == 'udt':
         return UDTClient(
-            args.server.pop(0), token, args.n_processes, args.dir)
+            args.server.pop(0), token, args.n_processes,
+            args.dir, args.server_public_key)
     elif args.mode == 'http':
         return HTTPClient(
             args.server.pop(0), token, args.n_processes, args.dir)
@@ -75,6 +76,10 @@ if __name__ == '__main__':
                      help='The parcel server udt address server[:port]')
     udt.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
                      help='uuids to download')
+    udt.add_argument('-k', '--server-public-key', required=True,
+                     type=lambda x: argparse.FileType('r')(x).read(),
+                     dest='server_public_key',
+                     help='authentication token file')
 
     #############################################################
     #                      HTTP options

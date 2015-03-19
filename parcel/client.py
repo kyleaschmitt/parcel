@@ -27,7 +27,6 @@ class Client(ParcelThread):
         self.n_procs = n_procs
         self.uri = uri
         self.directory = directory
-        print self.directory
 
     def get_segment_iterator(self, start, end, *args, **kwargs):
         raise NotImplementedError()
@@ -65,7 +64,7 @@ class Client(ParcelThread):
     def update_file_download(self, received):
         self.pbar.update(self.pbar.currval + received)
 
-    @state_method('authenticate', 'download_files', 'download', STATE_IDLE)
+    @state_method('handshake', 'download_files', 'download', STATE_IDLE)
     def download_files(self, file_ids, *args, **kwargs):
         """Download a list of files
 

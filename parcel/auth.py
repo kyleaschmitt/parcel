@@ -9,7 +9,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_PSS
 from log import get_logger
 
-KEY_LENGTH = 4096  # Key size (in bits)
+KEY_LENGTH = 2048  # Key size (in bits)
 random_gen = Random.new().read
 log = get_logger()
 
@@ -35,7 +35,7 @@ def server_auth(send, recv, key, **opts):
     msg = server_dec.decrypt(b64decode(recv(**opts)))
     msg = SHA.new(msg)
     msg = PKCS1_PSS.new(server_key).sign(msg)
-    send(b64encode(msg))
+    send(b64encode(msg), **opts)
 
     k = Random.new().read(AES.block_size)
     i = Random.new().read(AES.block_size)
@@ -60,8 +60,10 @@ def client_auth(send, recv, key, **opts):
     server_key = RSA.importKey(key)
     server_enc = PKCS1_OAEP.new(server_key)
 
+    log.info('Generating private key')
     client_key = RSA.generate(KEY_LENGTH, random_gen)
     client_dec = PKCS1_OAEP.new(client_key)
+    log.info('Generated private key')
 
     client_pub = client_key.publickey().exportKey()
     send(b64encode(client_pub), **opts)
@@ -70,7 +72,7 @@ def client_auth(send, recv, key, **opts):
     send(b64encode(server_enc.encrypt(msg)), **opts)
 
     msg = SHA.new(msg)
-    res = b64decode(recv())
+    res = b64decode(recv(**opts))
     if not PKCS1_PSS.new(server_key).verify(msg, res):
         log.debug('Signature failed validation.')
         raise ValueError('Server signature invalid.')

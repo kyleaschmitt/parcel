@@ -51,7 +51,7 @@ class Server(object):
     def server_thread(self, instance, uri, private_key):
         # try:
         #     log.info('New ServerThread: {}'.format(instance))
-        ServerThread(instance, instance, uri, private_key)
+        ServerThread(instance, uri, private_key)
         # except Exception, e:
         #     log.error('ServerThread exception: {}'.format(str(e)))
 
