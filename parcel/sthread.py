@@ -1,6 +1,7 @@
 import atexit
 import urlparse
 from threading import Thread
+import requests
 
 from parcel import auth
 from parcel_thread import ParcelThread
@@ -43,7 +44,7 @@ class ServerThread(ParcelThread):
         self.read_token()
 
         # Register teardown message callback
-        # atexit.register(self.close)
+        atexit.register(self.close)
 
         # Start thread processing
         while self.live:
@@ -120,7 +121,25 @@ class ServerThread(ParcelThread):
         }
 
     def download(self):
-        pass
+        request = self.read_json()
+        file_id = request['file_id']
+        name, size = self.request_file_information(file_id)
+        start = request.get('start', 0)
+        end = request.get('start', size)
+        url = urlparse.urljoin(self.uri, file_id)
+        print url, start, end
+        # headers = self.construct_header_with_range(start, end)
+        # log.debug('Reading range: [{}]'.format(headers.get('Range')))
+        # r = requests.get(url, headers=headers, verify=False, stream=True)
+        # offset = start
+        # total_written = 0
+        # # Then streaming of the data itself.
+        # for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
+        #     if not chunk:
+        #         continue  # Empty are keep-alives.
+        #     yield chunk
+        #     offset += len(chunk)
+        #     total_written += len(chunk)
 
     def read_token(self):
         self.token = self.next_payload()

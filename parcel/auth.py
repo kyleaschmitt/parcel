@@ -45,7 +45,7 @@ def server_auth(send, recv, key, **opts):
     return k, i
 
 
-def client_auth(send, recv, key, **opts):
+def client_auth(send, recv, key, private_key, public_key, **opts):
     '''Perform client-side pubkey authentication.
 
     :param send: Function taking one positional argument, payload to server.
@@ -59,15 +59,9 @@ def client_auth(send, recv, key, **opts):
 
     server_key = RSA.importKey(key)
     server_enc = PKCS1_OAEP.new(server_key)
+    client_dec = PKCS1_OAEP.new(private_key)
 
-    log.info('Generating private key')
-    client_key = RSA.generate(KEY_LENGTH, random_gen)
-    client_dec = PKCS1_OAEP.new(client_key)
-    log.info('Generated private key')
-
-    client_pub = client_key.publickey().exportKey()
-    send(b64encode(client_pub), **opts)
-
+    send(b64encode(public_key), **opts)
     msg = random_gen(4)
     send(b64encode(server_enc.encrypt(msg)), **opts)
 
@@ -81,3 +75,11 @@ def client_auth(send, recv, key, **opts):
     k, i = res[:len(res)/2], res[len(res)/2:]
 
     return k, i
+
+
+def generate_keypair():
+    log.info('Generating private key')
+    private_key = RSA.generate(KEY_LENGTH, random_gen)
+    public_key = private_key.publickey().exportKey()
+    log.info('Generated private key')
+    return private_key, public_key
