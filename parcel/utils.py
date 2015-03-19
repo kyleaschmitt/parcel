@@ -109,13 +109,6 @@ def parse_ranges(ranges):
         raise RuntimeError("Malformed ranges: {}".format(ranges))
 
 
-def check_transfer_size(actual, expected):
-    if actual != expected:
-        raise ValueError(
-            'Transfer size incorrect: {} != {} expected'.format(
-                actual, expected))
-
-
 def write_offset(path, data, offset):
     f = open(path, 'r+b')
     f.seek(offset)
@@ -136,51 +129,6 @@ def distribute(start, stop, block):
 
     """
     return [(a, min(stop, a+block)-1) for a in range(start, stop, block)]
-
-
-def add_range_to_header(url, header, start, end):
-    # parse url for host
-    scheme, host, path, params, q, frag = urlparse.urlparse(url)
-    header = {key: value for key, value in header.items()}
-    header['Range'] = 'bytes={}-{}'.format(start, end)
-    # provide host because it's mandatory, range request doesn't work otherwise
-    header['host'] = host
-    return header
-
-
-def construct_header(token, start=None, end=None):
-    return {
-        'X-Auth-Token': token,
-    }
-
-
-def check_status_code(r, url):
-    """Handle an un/successful requests.
-
-    If unsuccessful, return errors. Return of NoneType means
-    success. This is atypical but useful.
-
-    """
-    if r.status_code != 200:
-        msg = 'Request failed: ERROR {}: {}'.format(
-            r.status_code, r.text.replace('\n', ''))
-        raise RuntimeError(msg)
-    return None
-
-
-def read_range(path, url, headers, start, end):
-    headers = add_range_to_header(url, headers, start, end)
-    log.debug('Reading range: [{}]'.format(headers.get('Range')))
-    r = requests.get(url, headers=headers, verify=False, stream=True)
-    offset = start
-    total_written = 0
-    # Then streaming of the data itself.
-    for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
-        if not chunk:
-            continue  # Empty are keep-alives.
-        yield chunk
-        offset += len(chunk)
-        total_written += len(chunk)
 
 
 def parse_file_header(r, url):

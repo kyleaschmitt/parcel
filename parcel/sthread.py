@@ -12,7 +12,7 @@ from const import (
     STATE_IDLE, RES_CHUNK_SIZE
 )
 from utils import (
-    check_transfer_size, parse_ranges, construct_header
+    parse_ranges
 )
 
 # Logging
@@ -228,7 +228,7 @@ class ServerThread(ParcelThread):
         blocks = []
         while total_sent < file_size:
             self.send_async(self, blocks)
-            check_transfer_size(file_size, total_sent)
+            self.check_transfer_size(file_size, total_sent)
 
     def proxy_file_to_client(self, file_id, processes, verify=False,
                              buffer_retries=4, ranges=None):

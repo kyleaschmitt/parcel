@@ -9,7 +9,7 @@ from parcel_thread import ParcelThread
 from log import get_logger
 from const import STATE_IDLE, RES_CHUNK_SIZE
 from utils import (
-    check_transfer_size, print_download_information, construct_header,
+    print_download_information,
     set_file_length, distribute, try_retry_read_write_range,
     get_pbar, state_method
 )
@@ -48,7 +48,7 @@ class Client(ParcelThread):
         self.pbar = get_pbar(self.file_id, size)
 
     def finalize_file_download(self, size, total_received):
-        check_transfer_size(size, total_received)
+        self.check_transfer_size(size, total_received)
         self.stop_timer(size)
         self.pbar.finish()
 
