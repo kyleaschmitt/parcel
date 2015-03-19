@@ -121,6 +121,7 @@ class ServerThread(ParcelThread):
         pass
 
     def send_file_info(self):
+        print 'here'
         file_request = self.read_json()
         try:
             file_id = file_request['file_id']
