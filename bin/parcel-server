@@ -11,15 +11,14 @@ def main(args):
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
 
-    sthread_args = {
-        'data_server_url': args.server.pop(0),
-        'max_enc_threads': args.max_threads,
-        'buffer_processes': args.buffer_processes,
-        'prikey': args.prikey,
-    }
-
     server = parcel.Server()
-    server.start(host=args.host, port=args.port, sthread_args=sthread_args)
+    server.start(
+        host=args.host,
+        port=args.port,
+        uri=args.server.pop(0),
+        private_key=args.private_key,
+        public_key=args.public_key,
+    )
 
 
 if __name__ == '__main__':
@@ -32,20 +31,17 @@ if __name__ == '__main__':
                         help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
-    parser.add_argument('-n', '--max-threads', type=int, default=4,
-                        help='encryption threads to grant client')
-    parser.add_argument('-b', '--buffer_processes', type=int, default=8,
-                        help='Number of processes to use for async buffering from API')
 
     # Server private key options.
-    parser.add_argument('-K', '--keyfile',
-        dest='prikey',
-        default=None,
-        type=lambda x: argparse.FileType('r')(x).read(),
-        help='Server RSA private key file.',
-    )
-
+    parser.add_argument('--private-key',
+                        required=True,
+                        type=lambda x: argparse.FileType('r')(x).read(),
+                        help='Server RSA private key file.')
+    # Server public key options.
+    parser.add_argument('--public-key',
+                        required=True,
+                        type=lambda x: argparse.FileType('r')(x).read(),
+                        help='Server RSA private key file.')
 
     args = parser.parse_args()
-
     main(args)

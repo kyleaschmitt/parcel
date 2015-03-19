@@ -24,6 +24,7 @@ const int max_block_size = 64*1024;
 
 ThreadedEncryption::ThreadedEncryption(int _direction,
                                        unsigned char* _key,
+                                       unsigned char* _iv,
                                        int _n_threads)
 {
     const EVP_CIPHER *cipher;

@@ -11,7 +11,8 @@ log = get_logger('parcel_client')
 
 def get_client(args, token):
     if args.mode == 'udt':
-        raise NotImplementedError()
+        return UDTClient(
+            args.server.pop(0), token, args.n_processes, args.dir)
     elif args.mode == 'http':
         return HTTPClient(
             args.server.pop(0), token, args.n_processes, args.dir)
@@ -53,6 +54,9 @@ if __name__ == '__main__':
                                 'Defaults to current dir')
     general_parser.add_argument('-x', '--no-stats', action='store_true',
                                 help='turn off statistics printing')
+    general_parser.add_argument('-n', '--n-processes', type=int, default=4,
+                                help='Number of udt client connections.')
+
     token_args = general_parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file', default=None,
                             type=lambda x: argparse.FileType('r')(x).read(),
@@ -71,8 +75,6 @@ if __name__ == '__main__':
                      help='The parcel server udt address server[:port]')
     udt.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
                      help='uuids to download')
-    udt.add_argument('-n', '--n-threads', type=int, default=4,
-                     help='Number of encryption/http threads.')
 
     #############################################################
     #                      HTTP options
@@ -84,16 +86,6 @@ if __name__ == '__main__':
                       help='The http server address server[:port]')
     http.add_argument('file_ids', metavar='file_id', type=str, nargs='*',
                       help='uuids to download')
-    http.add_argument('-n', '--n-processes', type=int, default=4,
-                      help='Number of http .')
-    # Server public key options.
-    udt.add_argument(
-        '-K', '--keyfile',
-        dest='pubkey',
-        default=None,
-        type=lambda x: argparse.FileType('r')(x).read(),
-        help='Server RSA public key file.',
-    )
 
     args = parser.parse_args()
     main(args)

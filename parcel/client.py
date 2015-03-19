@@ -15,8 +15,8 @@ log = get_logger('client')
 
 
 def download_worker(args):
-    client, path, segment = args
-    client.try_retry_read_write_segment(path, segment)
+    client, path, segment, q_out = args
+    return client.try_retry_read_write_segment(path, segment, q_out)
 
 
 class Client(ParcelThread):
@@ -28,6 +28,15 @@ class Client(ParcelThread):
         self.uri = uri
         self.directory = directory
         print self.directory
+
+    def get_segment_iterator(self, start, end, *args, **kwargs):
+        raise NotImplementedError()
+
+    def try_retry_read_write_segment(self, path, segment, retries=3):
+        raise NotImplementedError()
+
+    def read_write_segment(self, path, segment):
+        raise NotImplementedError()
 
     def start_timer(self):
         self.start_time = time.time()
@@ -53,8 +62,8 @@ class Client(ParcelThread):
         self.stop_timer(size)
         self.pbar.finish()
 
-    def update_file_download(self, total_received):
-        self.pbar.update(total_received)
+    def update_file_download(self, received):
+        self.pbar.update(self.pbar.currval + received)
 
     @state_method('authenticate', 'download_files', 'download', STATE_IDLE)
     def download_files(self, file_ids, *args, **kwargs):
@@ -83,25 +92,34 @@ class Client(ParcelThread):
     @state_method('download_files', 'download_file', STATE_IDLE)
     def download_file(self, file_id, print_stats=False,
                       block_size=RES_CHUNK_SIZE):
-        self.file_id = file_id
-        file_size = self.parallel_download(block_size=block_size)
+        file_size = self.parallel_download(file_id)
         return file_size
 
-    def get_segment_iterator(self, start, end, *args, **kwargs):
-        raise NotImplementedError()
+    def parallel_download(self, file_id, verify=False):
 
-    def segment_download(self, path, start, stop, *args, **kwargs):
-        raise NotImplementedError()
+        # Process management
+        manager = Manager()
+        q = manager.Queue()
 
-    def parallel_download(self, verify=False, buffer_retries=4,
-                          block_size=RES_CHUNK_SIZE):
-
+        # File informaion
+        self.file_id = file_id
         name, size = self.request_file_information()
         path = self.get_file_path(name)
-        segments, block_size = self.split_file(size, self.n_procs*4)
+
+        # Create segments to stream
+        segments, block_size = self.split_file(size, self.n_procs)
         self.initialize_file_download(name, path, size)
-        args = ((self, path, segment) for segment in segments)
+        args = ((self, path, segment, q) for segment in segments)
+
+        # Divide work amongst process pool
         pool = Pool(self.n_procs)
-        total_received = sum(pool.map(download_worker, args))
+        async_result = pool.map_async(download_worker, args)
+
+        # Monitor progress
+        while self.pbar.currval < size:
+            self.update_file_download(q.get())
+
+        # Finalize download
+        total_received = sum(async_result.get())
         self.finalize_file_download(size, total_received)
         return total_received
