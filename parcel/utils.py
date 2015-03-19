@@ -164,8 +164,7 @@ def check_status_code(r, url):
     if r.status_code != 200:
         msg = 'Request failed: ERROR {}: {}'.format(
             r.status_code, r.text.replace('\n', ''))
-        log.error(str(msg))
-        return msg
+        raise RuntimeError(msg)
     return None
 
 
@@ -202,22 +201,6 @@ def parse_file_header(r, url):
     file_name = attachment.split('filename=')[-1] if attachment else None
 
     return size, file_name
-
-
-def make_file_request(url, headers, verify=False):
-    """Make request for file, just get the header.
-
-    If unsuccessful, return errors. Return of NoneType means
-    success. This is atypical but useful.
-
-    :returns: (errormsg, file size, file_name, request status code)
-
-    """
-    r = requests.get(url, headers=headers, verify=verify, stream=True)
-    errors = check_status_code(r, url)
-    size, file_name = parse_file_header(r, url)
-    r.close()
-    return errors, size, file_name, r.status_code
 
 
 def read_write_range(path, url, headers, start, end, q):
