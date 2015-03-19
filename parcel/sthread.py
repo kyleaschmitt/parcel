@@ -28,6 +28,7 @@ class ServerThread(ParcelThread):
 
         # Set attributes
         self.uri = uri
+        self.private_key = private_key
         self.live = True
         self.send_thread = None
 
@@ -37,12 +38,11 @@ class ServerThread(ParcelThread):
         self.iv = None
 
         # Initialize thread
-        # self.initialize_encryption()
+        self.initialize_encryption()
         self.handshake()
-        self.authenticate()
 
         # Register teardown message callback
-        atexit.register(self.close)
+        # atexit.register(self.close)
 
         # Start thread processing
         while self.live:
@@ -56,7 +56,7 @@ class ServerThread(ParcelThread):
         self.key, self.iv = auth.server_auth(
             self.send_payload,
             self.next_payload,
-            self.prikey,
+            self.private_key,
             encryption=False,
         )
         self.encryptor = lib.encryption_init(self.key, self.iv)
@@ -87,7 +87,7 @@ class ServerThread(ParcelThread):
         if self.token:
             log.info('Connected with token {} bytes'.format(len(self.token)))
 
-    @state_method('authenticate', 'event_loop')
+    @state_method('event_loop')
     def shut_down(self):
         """Exit the event loop
 
@@ -96,8 +96,7 @@ class ServerThread(ParcelThread):
         log.info('Thread exiting cleanly.')
         self.live = False
 
-    @state_method('authenticate', 'event_loop', 'download',
-                  'initialize_encryption')
+    @state_method('handshake', 'event_loop', 'download')
     def event_loop(self):
         """Loop over client requests
 
