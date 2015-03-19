@@ -10,7 +10,7 @@ from log import get_logger
 from const import STATE_IDLE, RES_CHUNK_SIZE
 from utils import (
     check_transfer_size, print_download_information, construct_header,
-    make_file_request, set_file_length, distribute, try_retry_read_write_range,
+    set_file_length, distribute, try_retry_read_write_range,
     get_pbar, state_method
 )
 
@@ -20,11 +20,13 @@ log = get_logger('client')
 
 class Client(ParcelThread):
 
-    def __init__(self, uri, token, n_procs, *args, **kwargs):
+    def __init__(self, uri, token, n_procs, directory):
         super(Client, self).__init__(None, None, None)
         self.token = token
         self.n_procs = n_procs
         self.uri = uri
+        self.directory = directory
+        print self.directory
 
     def start_timer(self):
         self.start_time = time.time()
@@ -35,14 +37,15 @@ class Client(ParcelThread):
             rate = (int(file_size)*8/1e9) / (self.stop_time - self.start_time)
             log.info('Download complete: {0:.2f} Gbps average'.format(rate))
 
-    def get_file_path(self, directory, file_id, file_name):
-        return os.path.join(directory, '{}.{}'.format(file_id, file_name))
+    def get_file_path(self, file_name):
+        return os.path.join(self.directory, '{}.{}'.format(
+            self.file_id, file_name))
 
-    def initialize_file_download(self, file_id, name, path, size):
+    def initialize_file_download(self, name, path, size):
         self.start_timer()
-        print_download_information(file_id, size, name, path)
+        print_download_information(self.file_id, size, name, path)
         set_file_length(path, size)
-        self.pbar = get_pbar(file_id, size)
+        self.pbar = get_pbar(self.file_id, size)
 
     def finalize_file_download(self, size, total_received):
         check_transfer_size(size, total_received)
@@ -74,40 +77,32 @@ class Client(ParcelThread):
 
         # Downlaod each file
         for file_id in file_ids:
-            self.download_file(file_id, *args, **kwargs)
+            self.download_file(file_id)
 
     @state_method('download_files', 'download_file', STATE_IDLE)
-    def download_file(self, file_id, directory=None,
-                      print_stats=False, block_size=RES_CHUNK_SIZE):
-        if not directory:
-            directory = os.path.abspath(os.getcwd())
-        file_size = self.parallel_download(
-            file_id, directory, block_size=block_size)
+    def download_file(self, file_id, print_stats=False,
+                      block_size=RES_CHUNK_SIZE):
+        self.file_id = file_id
+        file_size = self.parallel_download(block_size=block_size)
         return file_size
 
-    def segment_init(self, *args, **kwargs):
+    def segment_init(self, start, end, *args, **kwargs):
         raise NotImplementedError()
 
     def segment_download(self, path, start, stop, *args, **kwargs):
         raise NotImplementedError()
 
-    def request_file_information(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def parallel_download(self, file_id, directory, verify=False,
-                          buffer_retries=4, block_size=RES_CHUNK_SIZE):
-
+    def parallel_download(self, verify=False, buffer_retries=4,
+                          block_size=RES_CHUNK_SIZE):
         manager = Manager()
         q = manager.Queue()
 
-        name, size = self.request_file_information(file_id)
-        path = self.get_file_path(directory, file_id, name)
+        name, size = self.request_file_information()
+        path = self.get_file_path(name)
         segments, block_size = self.split_file(size, self.n_procs)
 
-        self.initialize_file_download(file_id, name, path, size)
-        for start, end in segments:
-            self.segment_init(start, end)
-            print segment
+        self.initialize_file_download(name, path, size)
+        responses = map(self.segment_init, segments)
 
         # Get range for each process in pool
         total_received = 0

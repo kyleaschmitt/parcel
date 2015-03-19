@@ -2,7 +2,7 @@ from ctypes import create_string_buffer
 from utils import state_method, vec
 import json
 from math import ceil
-
+import urlparse
 from log import get_logger
 
 from const import (
@@ -13,10 +13,11 @@ from const import (
     # States
     STATE_IDLE,
 )
-from utils import distribute
-
+from utils import (
+    distribute, construct_header, check_status_code, parse_file_header
+)
 from lib import lib
-
+import requests
 
 # Logging
 log = get_logger('parcel')
@@ -35,6 +36,8 @@ class ParcelThread(object):
         self.instance = instance
         self.socket = socket
         self.close_func = close_func
+        self.uri = None
+        self.token = None
         log.debug('New instance {}'.format(self))
 
     def __repr__(self):
@@ -142,3 +145,24 @@ class ParcelThread(object):
         block_size = int(ceil(float(size)/blocks))
         segments = distribute(0, size, block_size)
         return segments, block_size
+
+    ############################################################
+    #                   REST API Functions
+    ############################################################
+
+    def request_file_information(self):
+        url = urlparse.urljoin(self.uri, self.file_id)
+        headers = construct_header(self.token)
+        log.info('Request to {}'.format(url))
+        size, name = self.make_file_request(url, headers)
+        return name, size
+
+    def make_file_request(self, url, headers, verify=False):
+        """Make request for file, just get the header.
+
+        """
+        r = requests.get(url, headers=headers, verify=verify, stream=True)
+        check_status_code(r, url)
+        size, file_name = parse_file_header(r, url)
+        r.close()
+        return size, file_name
