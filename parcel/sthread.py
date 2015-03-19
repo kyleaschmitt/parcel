@@ -8,7 +8,7 @@ from utils import state_method
 from lib import lib
 from log import get_logger
 from const import (
-    CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
+    CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE, CNTL_FILE_INFO,
     STATE_IDLE, RES_CHUNK_SIZE
 )
 from version import version, compatible_versions
@@ -105,6 +105,7 @@ class ServerThread(ParcelThread):
         switch = {
             CNTL_EXIT: self.shut_down,
             CNTL_DOWNLOAD: self.download,
+            CNTL_FILE_INFO: self.send_file_info,
         }
         cntl = self.recv_control()
         if cntl not in switch:
@@ -115,3 +116,26 @@ class ServerThread(ParcelThread):
         return {
             'version': version
         }
+
+    def download(self):
+        pass
+
+    def send_file_info(self):
+        file_request = self.read_json()
+        try:
+            file_id = file_request['file_id']
+        except Exception as e:
+            self.send_json({'error': 'Malformed request: {}'.format(str(e))})
+            raise RuntimeError('Malformed file info request: {} {}'.format(
+                str(e), file_request))
+        try:
+            name, size = self.request_file_information(file_id)
+        except:
+            self.send_json({'error': 'Malformed request'})
+            raise RuntimeError('Malformed file info request: {}'.format(
+                file_request))
+
+        self.send_json({
+            'file_name': name,
+            'file_size': size
+        })

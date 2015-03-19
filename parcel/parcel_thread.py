@@ -65,6 +65,7 @@ class ParcelThread(object):
     def send(self, data, size=None, encryption=True, encrypt_inplace=False):
         if encrypt_inplace and encryption:
             assert isinstance(data, str)
+            # copy because encryption is in place
             to_send = (data+'\0')[:-1]
         else:
             to_send = data
@@ -101,18 +102,21 @@ class ParcelThread(object):
         self.send_payload_size(size, **send_args)
         self.send(payload, size, **send_args)
 
-    def send_control(self, cntl, **send_args):
-        cntl_buff = create_string_buffer(LEN_CONTROL)
-        cntl_buff.raw = cntl
-        self.send(cntl_buff, LEN_CONTROL, **send_args)
+    def send_control(self, control, **send_args):
+        self.send_json({'CONTROL': control}, **send_args)
 
     def recv_control(self, expected=None, **read_args):
-        cntl = self.read_size(LEN_CONTROL, **read_args)
-        log.debug('CONTROL: {}'.format(ord(cntl)))
-        if expected is not None and cntl not in vec(expected):
+        cntl_json = self.read_json(**read_args)
+        try:
+            control = cntl_json['CONTROL']
+        except KeyError:
+            log.error('Received a non-control message: {}'.format(cntl_json))
+            raise
+        log.debug('CONTROL: {}'.format(control))
+        if expected is not None and control not in vec(expected):
             raise RuntimeError('Unexpected control msg: {} != {}'.format(
-                ord(cntl), ord(expected)))
-        return cntl
+                control, expected))
+        return control
 
     def send_json(self, doc, **send_args):
         payload = json.dumps(doc)
@@ -149,17 +153,17 @@ class ParcelThread(object):
     #                   REST API Functions
     ############################################################
 
-    def request_file_information(self):
+    def request_file_information(self, file_id):
         headers = self.construct_header()
         r = self.make_file_request(headers, close=True)
-        size, name = self.parse_file_header(r, self.file_id)
+        size, name = self.parse_file_header(r, file_id)
         return name, size
 
-    def make_file_request(self, headers, verify=False, close=False):
+    def make_file_request(self, file_id, headers, verify=False, close=False):
         """Make request for file, just get the header.
 
         """
-        url = urlparse.urljoin(self.uri, self.file_id)
+        url = urlparse.urljoin(self.uri, file_id)
         log.debug('Request to {}'.format(url))
         r = requests.get(url, headers=headers, verify=verify, stream=True)
         r.raise_for_status()
