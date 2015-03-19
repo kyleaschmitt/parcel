@@ -59,11 +59,11 @@ if __name__ == '__main__':
                                 help='Number of udt client connections.')
 
     token_args = general_parser.add_mutually_exclusive_group(required=False)
-    token_args.add_argument('-t', '--token-file', default=None,
+    token_args.add_argument('-t', '--token-file', default='',
                             type=lambda x: argparse.FileType('r')(x).read(),
                             dest='token',
                             help='authentication token file')
-    token_args.add_argument('-T', '--token', default=None, type=str,
+    token_args.add_argument('-T', '--token', default='', type=str,
                             dest='token', help='authentication token')
 
     #############################################################

@@ -40,6 +40,7 @@ class ServerThread(ParcelThread):
         # Initialize thread
         self.initialize_encryption()
         self.handshake()
+        self.read_token()
 
         # Register teardown message callback
         # atexit.register(self.close)
@@ -53,14 +54,14 @@ class ServerThread(ParcelThread):
         if not self.private_key:
             raise RuntimeError('No private key for encryption.')
         log.info('Performing pubkey handshake.')
-        self.key, self.iv = auth.server_auth(
+        private_key, iv = auth.server_auth(
             self.send_payload,
             self.next_payload,
             self.private_key,
             encryption=False,
         )
-        self.encryptor = lib.encryption_init(self.key, self.iv)
-        self.decryptor = lib.decryption_init(self.key, self.iv)
+        self.encryptor = lib.encryption_init(private_key, iv)
+        self.decryptor = lib.decryption_init(private_key, iv)
 
     @state_method('initialize_encryption', STATE_IDLE)
     def handshake(self):
@@ -108,9 +109,10 @@ class ServerThread(ParcelThread):
             CNTL_FILE_INFO: self.send_file_info,
         }
         cntl = self.recv_control()
+
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
-            switch[cntl]()
+        switch[cntl]()
 
     def get_server_options(self):
         return {
@@ -120,21 +122,16 @@ class ServerThread(ParcelThread):
     def download(self):
         pass
 
+    def read_token(self):
+        self.token = self.next_payload()
+
     def send_file_info(self):
-        print 'here'
-        file_request = self.read_json()
-        try:
-            file_id = file_request['file_id']
-        except Exception as e:
-            self.send_json({'error': 'Malformed request: {}'.format(str(e))})
-            raise RuntimeError('Malformed file info request: {} {}'.format(
-                str(e), file_request))
+        file_id = self.next_payload()
         try:
             name, size = self.request_file_information(file_id)
-        except:
-            self.send_json({'error': 'Malformed request'})
-            raise RuntimeError('Malformed file info request: {}'.format(
-                file_request))
+        except Exception as e:
+            self.send_json({'error': str(e)})
+            raise
 
         self.send_json({
             'file_name': name,
