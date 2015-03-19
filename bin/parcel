@@ -4,7 +4,7 @@ import parcel
 import logging
 from urlparse import urlparse
 
-from parcel import manifest
+from parcel import manifest, HTTPClient, UDTClient
 from parcel.log import get_logger
 
 
@@ -22,20 +22,10 @@ def parse_host(server):
 
 def get_client(args, token):
     if args.mode == 'udt':
-        host, port = parse_host(args.server.pop(0))
-        client = parcel.UDTClient(
-            token,
-            host=host,
-            port=port,
-            n_threads=args.n_threads,
-            pubkey=args.pubkey,
-        )
+        raise NotImplementedError()
     elif args.mode == 'http':
-        client = parcel.HTTPClient(
-            token,
-            url=args.server.pop(0),
-            n_processes=args.n_processes,
-        )
+        client = HTTPClient(
+            args.server.pop(0), token, args.n_processes)
     else:
         raise RuntimeError('Unknown functionality.')
     return client
@@ -96,7 +86,8 @@ if __name__ == '__main__':
                      help='turn off statistics printing')
 
     # Server public key options.
-    udt.add_argument('-K', '--keyfile',
+    udt.add_argument(
+        '-K', '--keyfile',
         dest='pubkey',
         default=None,
         type=lambda x: argparse.FileType('r')(x).read(),

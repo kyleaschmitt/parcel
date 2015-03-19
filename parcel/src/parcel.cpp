@@ -19,12 +19,9 @@
 
 using namespace std;
 
-typedef struct monitor_args {
-    int live;
-    int64_t downloaded;
-    int64_t file_size;
-    UDTSOCKET *s;
-} monitor_args;
+class Server;
+class ServerThread;
+class Client;
 
 void* recvdata(void*);
 void* monitor(void* margs);
@@ -35,19 +32,13 @@ EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len);
 EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len);
+EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
+                     char *buff, int len);
 
-class ServerThread
-{
-public:
-    UDTSOCKET recver;
-    char* data;
-    char clienthost[NI_MAXHOST];
-    char clientport[NI_MAXSERV];
-    int udt_buff;
 
-    ServerThread(UDTSOCKET *socket, char* host, char* port);
-    int close();
-};
+/***********************************************************************
+ *                               Server
+ ***********************************************************************/
 
 class Server
 {
@@ -67,23 +58,6 @@ public:
 };
 
 
-class Client
-{
-public:
-    int blast;
-    int blast_rate;
-    int udt_buff;
-    int udp_buff;
-    int mss;
-    UDTSOCKET client;
-    monitor_args margs;
-
-    Client();
-    int close();
-    int start(char *host, char *port);
-};
-
-
 Server::Server()
 {
     blast = 0;
@@ -98,12 +72,12 @@ int Server::start(char *host, char *port)
     // setup socket
     addrinfo hints;
     addrinfo* res;
+
+    // Setup address information
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_flags = AI_PASSIVE;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-
-    // Setup address information
     if (0 != getaddrinfo(NULL, port, &hints, &res)){
         cerr << "illegal port number or port is busy: [" << port << "]" << endl;
         return 0;
@@ -111,7 +85,6 @@ int Server::start(char *host, char *port)
 
     // Create the server socket
     serv = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
     UDT::setsockopt(serv, 0, UDT_MSS, &mss, sizeof(int));
     UDT::setsockopt(serv, 0, UDT_SNDBUF, &udt_buff, sizeof(int));
     UDT::setsockopt(serv, 0, UDP_SNDBUF, &udp_buff, sizeof(int));
@@ -140,12 +113,58 @@ int Server::close()
     return 0;
 }
 
-ServerThread *Server::next_client(){
+/***********************************************************************
+ *                          Server C Wrappers
+ ***********************************************************************/
+
+
+EXTERN Server* new_server(){
+    return new Server();
+}
+
+EXTERN ServerThread* server_next_client(Server *server){
+    return server->next_client();
+}
+
+EXTERN int server_set_buffer_size(Server *server, int size){
+    server->udt_buff = size;
+    return 0;
+}
+
+EXTERN int server_start(Server *server, char *host, char *port){
+    return server->start(host, port);
+}
+
+EXTERN int server_close(Server *server){
+    server->close();
+    delete server;
+    return 0;
+}
+
+/***********************************************************************
+ *                           Server Thread
+ ***********************************************************************/
+
+class ServerThread
+{
+public:
+    UDTSOCKET recver;
+    char* data;
+    char clienthost[NI_MAXHOST];
+    char clientport[NI_MAXSERV];
+    int udt_buff;
+
+    ServerThread(UDTSOCKET *socket, char* host, char* port);
+    int close();
+};
+
+
+ServerThread *Server::next_client()
+{
 
     UDTSOCKET recver;
     sockaddr_storage clientaddr;
     int addrlen = sizeof(clientaddr);
-
 
     // Wait for the next connection
     recver = UDT::accept(serv, (sockaddr*)&clientaddr, &addrlen);
@@ -169,8 +188,69 @@ ServerThread *Server::next_client(){
     return new ServerThread(new UDTSOCKET(recver), clienthost, clientservice);
 }
 
+ServerThread::ServerThread(UDTSOCKET *usocket, char *host, char *port)
+{
+    memcpy(clienthost, host, NI_MAXHOST);
+    memcpy(clientport, port, NI_MAXSERV);
+    recver = *(UDTSOCKET*)usocket;
+    delete (UDTSOCKET*)usocket;
+}
+
+int ServerThread::close(){
+    return UDT::close(recver);
+}
+
+/***********************************************************************
+ *                      ServerThread Wrappers
+ ***********************************************************************/
+
+EXTERN int sthread_close(Server *sthread){
+    sthread->close();
+    delete sthread;
+    return 0;
+}
+
+EXTERN char* sthread_get_clienthost(ServerThread *sthread){
+    return sthread->clienthost;
+}
+
+EXTERN char* sthread_get_clientport(ServerThread *sthread){
+    return sthread->clientport;
+}
+
+EXTERN UDTSOCKET sthread_get_socket(ServerThread *sthread){
+    return sthread->recver;
+}
+
+/***********************************************************************
+ *                               Client
+ ***********************************************************************/
+
+class Client
+{
+public:
+    int blast;
+    int blast_rate;
+    int udt_buff;
+    int udp_buff;
+    int mss;
+    UDTSOCKET client;
+    int live;
+    int64_t downloaded;
+    int64_t file_size;
+
+
+    Client();
+    int close();
+    int start(char *host, char *port);
+};
+
+
 Client::Client()
 {
+    live = 0;
+    downloaded = 0;
+    file_size = 0;
     blast = 0;
     blast_rate = 0;
     udt_buff = BUFF_SIZE;
@@ -181,20 +261,24 @@ Client::Client()
 int Client::start(char *host, char *port)
 {
     struct addrinfo hints, *local, *peer;
+
+    // Setup address information
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_flags = AI_PASSIVE;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-
     if (0 != getaddrinfo(NULL, port, &hints, &local)){
         cerr << "incorrect network address.\n" << endl;
         return -1;
     }
 
+    // Connect to server
     client = UDT::socket(local->ai_family, local->ai_socktype,
                          local->ai_protocol);
+    // We are not done with local
     freeaddrinfo(local);
 
+    // Set socket options
     UDT::setsockopt(client, 0, UDT_MSS, &mss, sizeof(int));
     UDT::setsockopt(client, 0, UDT_SNDBUF, &udt_buff, sizeof(int));
     UDT::setsockopt(client, 0, UDP_SNDBUF, &udp_buff, sizeof(int));
@@ -210,10 +294,11 @@ int Client::start(char *host, char *port)
         cerr << "connect: " << UDT::getlasterror().getErrorMessage() << endl;
         return -1;
     }
+    // We are now done with peer
     freeaddrinfo(peer);
+
     return 0;
 }
-
 
 int Client::close()
 {
@@ -221,16 +306,75 @@ int Client::close()
     return 0;
 }
 
+/***********************************************************************
+ *                        Client C Wrappers
+ ***********************************************************************/
 
-ServerThread::ServerThread(UDTSOCKET *usocket, char *host, char *port){
-    memcpy(clienthost, host, NI_MAXHOST);
-    memcpy(clientport, port, NI_MAXSERV);
-    recver = *(UDTSOCKET*)usocket;
-    delete (UDTSOCKET*)usocket;
+EXTERN Client* new_client(){
+    return new Client();
 }
 
-int ServerThread::close(){
-    return UDT::close(recver);
+EXTERN int client_start(Client *client, char *host, char *port){
+    return client->start(host, port);
+}
+
+EXTERN UDTSOCKET client_get_socket(Client *client){
+    return client->client;
+}
+
+EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
+                                  char *path, int64_t size,
+                                  int64_t block_size, int print_stats)
+{
+    char *buffer = new char[block_size];
+
+    // Open the output file
+    fstream ofs(path, ios::out | ios::binary | ios::trunc);
+
+    // Set information on the client for external monitoring
+    client->downloaded = 0;
+    client->live = 1;
+
+    // Start reading the file
+    while (client->downloaded < size){
+        // Read in the next block
+        int64_t this_size = min(size-client->downloaded, block_size);
+        int rs = read_size(decryptor, client->client, buffer, this_size);
+        // Check the read
+        if (rs < 0){
+            cerr << "Unable to write to file: " << path << endl;
+            return rs;
+        }
+        // Try to write to file
+        if (!ofs.write(buffer, rs)){
+            cerr << "Unable to write to file: " << path << endl;
+            return -1;
+        }
+        // Increment counter
+        client->downloaded += rs;
+    }
+    // Close the file
+    ofs.close();
+    // Delete our buffer
+    delete buffer;
+    // Tell any external monitors that we are done
+    client->live = 0;
+    // Return the total amount downloaded
+    return client->downloaded;
+}
+
+EXTERN int get_client_live(Client *client){
+    return client->live;
+}
+
+EXTERN int64_t get_client_downloaded(Client *client){
+    return client->downloaded;
+}
+
+EXTERN int client_close(Client *client){
+    client->close();
+    delete client;
+    return 0;
 }
 
 /***********************************************************************
@@ -258,8 +402,8 @@ EXTERN int send_data_no_encryption(UDTSOCKET socket, char *data, int size)
 EXTERN int read_data_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
-    int rs = UDT::recv(socket, buff, len, 0);
-    if (UDT::ERROR == rs) {
+    int rs = 0;
+    if (UDT::ERROR == (rs = UDT::recv(socket, buff, len, 0))){
         if (UDT::getlasterror().getErrorCode() != 2001)
             cerr << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         return -1;
@@ -270,44 +414,68 @@ EXTERN int read_data_no_encryption(UDTSOCKET socket, char *buff, int len)
 EXTERN int read_size_no_encryption(UDTSOCKET socket, char *buff, int len)
 {
     assert(len >= 0);
+    int total_read = 0;
     int rs = 0;
-    int ret = 0;
-    while (rs < len){
-        if ((ret = read_data_no_encryption(socket, buff+rs, len - rs)) < 0){
-            return ret;
+
+    while (total_read < len){
+        if ((rs = read_data_no_encryption(socket, buff+rs, len - rs)) < 0){
+            cerr << "Unable to read from socket" << endl;
+            return rs;
         }
-        rs += ret;
+        total_read += rs;
     }
-    return rs;
+    return total_read;
 }
 
 EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    int rs = read_data_no_encryption(socket, buff, len);
-    decryptor->map_threaded(buff, buff, rs);
-    return rs;
+    int total_read;
+    if (len != (total_read = read_data_no_encryption(socket, buff, len))){
+        cerr << "Invalid read." << endl;
+        return total_read;
+    }
+    decryptor->map_threaded(buff, buff, total_read);
+    return total_read;
 }
 
 EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
-    int rs = read_size_no_encryption(socket, buff, len);
-    decryptor->map_threaded(buff, buff, rs);
-    return rs;
+    int total_read;
+
+    // Read data from UDT socket and check length
+    if (len != (total_read = read_size_no_encryption(socket, buff, len))){
+        cerr << "Invalid read: " << total_read << " != " << len << endl;
+        return total_read;
+    }
+    // Decrypt the data in place
+    if (len != decryptor->map_threaded(buff, buff, total_read)){
+        cerr << "Invalid decrypt: " << total_read << " != " << len << endl;
+        return total_read;
+    }
+    // Return the total_read
+    return total_read;
 }
 
 EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
+    // Encrypt the buffer in place
     encryptor->map_threaded(buff, buff, len);
-    int ss = send_data_no_encryption(socket, buff, len);
-    return ss;
+    // Send data over UDT socket
+    int total_sent = send_data_no_encryption(socket, buff, len);
+    // Check send length
+    if (total_sent != len){
+        cerr << "Invalid write: " << total_sent << " != " << len << endl;
+        return total_sent;
+    }
+    return total_sent;
 }
 
 
 /***********************************************************************
- *                        Encryption functions
+ *                        Encryption Wrappers
  ***********************************************************************/
 
 EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
@@ -318,138 +486,4 @@ EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
 EXTERN ThreadedEncryption *decryption_init(char *key, int n_threads)
 {
     return new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
-}
-
-/***********************************************************************
- *                Wrappers for CTypes Python bindings
- ***********************************************************************/
-
-EXTERN Client* new_client(){
-    return new Client();
-}
-
-
-EXTERN int client_start(Client *client, char *host, char *port){
-    return client->start(host, port);
-}
-
-EXTERN int client_close(Client *client){
-    client->close();
-    delete client;
-    return 0;
-}
-
-EXTERN Server* new_server(){
-    return new Server();
-}
-
-EXTERN ServerThread* server_next_client(Server *server){
-    return server->next_client();
-}
-
-EXTERN int server_set_buffer_size(Server *server, int size){
-    server->udt_buff = size;
-    return 0;
-}
-
-EXTERN int server_start(Server *server, char *host, char *port){
-    return server->start(host, port);
-}
-
-EXTERN int server_close(Server *server){
-    server->close();
-    delete server;
-    return 0;
-}
-
-EXTERN int sthread_close(Server *sthread){
-    sthread->close();
-    delete sthread;
-    return 0;
-}
-
-EXTERN char* sthread_get_clienthost(ServerThread *sthread){
-    return sthread->clienthost;
-}
-
-EXTERN char* sthread_get_clientport(ServerThread *sthread){
-    return sthread->clientport;
-}
-
-EXTERN UDTSOCKET sthread_get_socket(ServerThread *sthread){
-    return sthread->recver;
-}
-
-EXTERN UDTSOCKET client_get_socket(Client *client){
-    return client->client;
-}
-
-
-EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
-                                  char *path, int64_t size,
-                                  int64_t block_size, int print_stats)
-{
-
-    char *buffer = new char[block_size];
-    fstream ofs(path, ios::out | ios::binary | ios::trunc);
-    int64_t total_read = 0;
-    client->margs.downloaded = 0;
-    client->margs.live = 1;
-
-    while (total_read < size){
-        int64_t this_size = min(size-total_read, block_size);
-        int rs = read_size(decryptor, client->client, buffer, this_size);
-        if (rs < 0){
-            cerr << "Unable to write to file: " << path << endl;
-            return rs;
-        }
-        if (!ofs.write(buffer, rs)){
-            cerr << "Unable to write to file: " << path << endl;
-            return -1;
-        }
-        total_read += rs;
-        if (print_stats){
-            client->margs.downloaded = total_read;
-        }
-    }
-
-    ofs.close();
-    delete buffer;
-    client->margs.live = 0;
-
-    return total_read;
-}
-
-void* monitor(void* _arg)
-{
-    monitor_args *margs = (monitor_args*)_arg;
-    UDT::TRACEINFO perf;
-    while (margs->live) {
-        sleep(1);
-        if (UDT::ERROR == UDT::perfmon(*margs->s, &perf)) {
-            cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
-            break;
-        }
-        fprintf(stderr, "%c[2K\t\t", 27);  // Clear line
-        cerr.width(16);
-        cerr.precision(4);
-        cerr.setf( std::ios::fixed, std:: ios::floatfield );
-        cerr <<  "Gbps: " << perf.mbpsRecvRate/1e3;
-        cerr.width(8);
-        cerr.setf( std::ios::fixed, std:: ios::floatfield );
-        cerr << "\tGB: " << margs->downloaded/1e9;
-        cerr.width(18);
-        cerr << "File: " << margs->downloaded*100/margs->file_size << " %";
-        cerr << "\r";
-    }
-    cerr << endl;
-    return NULL;
-}
-
-EXTERN int get_client_margs_live(Client *client){
-    return client->margs.live;
-}
-
-EXTERN int64_t get_client_margs_downloaded(Client *client){
-    return client->margs.downloaded;
 }
