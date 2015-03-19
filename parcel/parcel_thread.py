@@ -9,12 +9,12 @@ from const import (
     # Lengths
     LEN_CONTROL, LEN_PAYLOAD_SIZE,
     # Control messages
-    CNTL_EXIT,
+    CNTL_EXIT, RES_CHUNK_SIZE,
     # States
     STATE_IDLE,
 )
 from utils import (
-    distribute, construct_header, check_status_code, parse_file_header
+    distribute, parse_file_header
 )
 from lib import lib
 import requests
@@ -152,7 +152,7 @@ class ParcelThread(object):
 
     def request_file_information(self):
         url = urlparse.urljoin(self.uri, self.file_id)
-        headers = construct_header(self.token)
+        headers = self.construct_header()
         log.info('Request to {}'.format(url))
         size, name = self.make_file_request(url, headers)
         return name, size
@@ -162,7 +162,53 @@ class ParcelThread(object):
 
         """
         r = requests.get(url, headers=headers, verify=verify, stream=True)
-        check_status_code(r, url)
+        self.check_status_code(r, url)
         size, file_name = parse_file_header(r, url)
         r.close()
         return size, file_name
+
+    def construct_header(self):
+        return {
+            'X-Auth-Token': self.token,
+        }
+
+    def construct_header_with_range(self, start, end):
+        header = self.construct_header()
+        header['Range'] = 'bytes={}-{}'.format(start, end)
+        # provide host because it's mandatory, range request
+        # doesn't work otherwise
+        scheme, host, path, params, q, frag = urlparse.urlparse(self.uri)
+        header['host'] = host
+        return header
+
+    def check_status_code(self, r, url):
+        """Handle an un/successful requests.
+
+        If unsuccessful, return errors. Return of NoneType means
+        success. This is atypical but useful.
+
+        """
+        if r.status_code != 200:
+            msg = 'Request failed: ERROR {}: {}'.format(
+                r.status_code, r.text.replace('\n', ''))
+            raise RuntimeError(msg)
+
+    def read_range_to_file(self, path, url, headers, start, end):
+        headers = self.construct_header_with_range(start, end)
+        log.debug('Reading range: [{}]'.format(headers.get('Range')))
+        r = requests.get(url, headers=headers, verify=False, stream=True)
+        offset = start
+        total_written = 0
+        # Then streaming of the data itself.
+        for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
+            if not chunk:
+                continue  # Empty are keep-alives.
+            yield chunk
+            offset += len(chunk)
+            total_written += len(chunk)
+
+    def check_transfer_size(self, actual, expected):
+        if actual != expected:
+            raise ValueError(
+                'Transfer size incorrect: {} != {} expected'.format(
+                    actual, expected))
