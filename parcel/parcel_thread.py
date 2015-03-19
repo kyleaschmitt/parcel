@@ -1,6 +1,7 @@
 from ctypes import create_string_buffer
 from utils import state_method, vec
 import json
+from math import ceil
 
 from log import get_logger
 
@@ -12,6 +13,7 @@ from const import (
     # States
     STATE_IDLE,
 )
+from utils import distribute
 
 from lib import lib
 
@@ -131,3 +133,12 @@ class ParcelThread(object):
     @state_method('handshake')
     def authenticate(self, *args, **kwargs):
         raise NotImplementedError()
+
+    ############################################################
+    #                          Util
+    ############################################################
+
+    def split_file(self, size, blocks):
+        block_size = int(ceil(float(size)/blocks))
+        segments = distribute(0, size, block_size)
+        return segments, block_size

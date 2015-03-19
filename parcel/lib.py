@@ -80,15 +80,15 @@ class ParcelDLL(object):
         self.client_recv_file.argtypes = (c_void_p, c_void_p, c_void_p, c_longlong, c_longlong, c_int)
         self.client_recv_file.restype = c_longlong
 
-        # int get_client_margs_live(Client *client)
-        self.get_client_margs_live = _lib.get_client_margs_live
-        self.get_client_margs_live.argtypes = (c_void_p,)
-        self.get_client_margs_live.restype = c_int
+        # int get_client_live(Client *client)
+        self.get_client_live = _lib.get_client_live
+        self.get_client_live.argtypes = (c_void_p,)
+        self.get_client_live.restype = c_int
 
-        # int get_client_margs_downloaded(Client *client)
-        self.get_client_margs_downloaded = _lib.get_client_margs_downloaded
-        self.get_client_margs_downloaded.argtypes = (c_void_p,)
-        self.get_client_margs_downloaded.restype = c_longlong
+        # int get_client_downloaded(Client *client)
+        self.get_client_downloaded = _lib.get_client_downloaded
+        self.get_client_downloaded.argtypes = (c_void_p,)
+        self.get_client_downloaded.restype = c_longlong
 
 
 lib = ParcelDLL()

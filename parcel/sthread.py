@@ -1,16 +1,18 @@
 import atexit
+import urlparse
+from threading import Thread
 
 from parcel import auth
 from parcel_thread import ParcelThread
 from utils import state_method
 from lib import lib
 from log import get_logger
-from http import proxy_file_to_client
 from const import (
-    # Control messages
     CNTL_EXIT, CNTL_DOWNLOAD, CNTL_HANDSHAKE,
-    # States
-    STATE_IDLE,
+    STATE_IDLE, RES_CHUNK_SIZE
+)
+from utils import (
+    check_transfer_size, parse_ranges, construct_header
 )
 
 # Logging
@@ -66,7 +68,7 @@ class ServerThread(ParcelThread):
         except:
             log.error('Unable to process client options: {}'.format(
                 client_options))
-        log.debug('Client options: {}'.format(client_options))
+            log.debug('Client options: {}'.format(client_options))
 
     def clientport(self):
         return lib.sthread_get_clientport(self.instance)
@@ -79,7 +81,7 @@ class ServerThread(ParcelThread):
         """Authentication stub
 
         """
-        if self.prikey: # Server private key specified - perform exchange.
+        if self.prikey:  # Server private key specified - perform exchange.
             log.info('Performing pubkey handshake.')
             self.key, self.iv = auth.server_auth(
                 self.send_payload,
@@ -101,9 +103,6 @@ class ServerThread(ParcelThread):
         log.info('Thread exiting cleanly.')
         self.live = False
 
-    def proxy_file_to_client(self, *args, **kwargs):
-        return proxy_file_to_client(self, *args, **kwargs)
-
     @state_method('event_loop')
     def download(self):
         """Proxy a file to the client
@@ -111,13 +110,15 @@ class ServerThread(ParcelThread):
         try:
             file_request = self.read_json()
             file_id = file_request['file_id']
+            ranges = file_request.get('Range', None)
+
         except Exception as e:
             self.send_json({
                 'error': 'Malformed file_request: {}'.format(str(e))})
             raise
 
         try:
-            self.proxy_file_to_client(file_id, self.buffer_processes)
+            self.proxy_file_to_client(file_id, self.buffer_processes, ranges)
         except Exception as e:
             log.error('Unable to proxy file to client: {}'.format(str(e)))
             raise
@@ -136,7 +137,7 @@ class ServerThread(ParcelThread):
         cntl = self.recv_control()
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
-        switch[cntl]()
+            switch[cntl]()
 
     @state_method(STATE_IDLE)
     def initialize_encryption(self, key, max_threads):
@@ -175,3 +176,86 @@ class ServerThread(ParcelThread):
         # Initialize Encryption
         self.encryptor = lib.encryption_init(key, requested_threads)
         self.decryptor = lib.decryption_init(key, requested_threads)
+
+    def sthread_join_send_thread(self):
+        """If the sthread already has a send_thread, then join it
+
+        :returns: None
+
+        """
+        if self.send_thread:
+            self.send_thread.join()
+            self.send_thread = None
+
+    def udt_send_blocks(self, blocks):
+        """Loop over blocks and send them serially.  Included here as a target
+        for async writes to UDT.
+
+        :returns: None
+
+        """
+        for block in blocks:
+            log.debug('Sending {} bytes'.format(len(block)))
+            self.send(block, len(block))
+
+    def send_async(self, blocks):
+        """Join any previously started send thread, and start a new one
+
+        :returns: None
+
+        """
+        self.join_send_thread(self)
+        self.send_thread = Thread(
+            target=self.udt_send_blocks, args=(self, blocks))
+        self.send_thread.start()
+
+    def async_stream_data_to_client(self, url, file_size, headers,
+                                    processes, buffer_retries,
+                                    block_size=RES_CHUNK_SIZE):
+        """Buffer and send
+
+        1. async buffer get in parallel
+        2. async send the blocks that we got last time (none the 1st round)
+        3. wait for the buffering to return
+        4. goto 1 until read complete
+        5. send last set of blocks
+
+        """
+        log.info('Proxying {} to client'.format(url))
+
+        total_sent = 0
+
+        blocks = []
+        while total_sent < file_size:
+            self.send_async(self, blocks)
+            check_transfer_size(file_size, total_sent)
+
+    def proxy_file_to_client(self, file_id, processes, verify=False,
+                             buffer_retries=4, ranges=None):
+
+        if ranges:
+            parse_range(ranges)
+            url = urlparse.urljoin(self.data_server_url, file_id)
+            log.info('Download request: {}'.format(url))
+
+        headers = construct_header(self.token)
+        try:
+            errors, size, file_name, status_code = self.make_file_request(
+                url, headers)
+        except Exception as e:
+            self.send_json({'error': str(e)})
+            return str(e)
+
+        # Send file header to client
+        self.send_json({
+            'error': errors,
+            'file_size': size,
+            'file_name': file_name,
+            'status_code': status_code,
+        })
+
+        if not errors:
+            self.async_stream_data_to_client(
+                url, size, headers, processes, buffer_retries, ranges)
+
+        return None
