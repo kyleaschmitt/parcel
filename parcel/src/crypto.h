@@ -87,8 +87,8 @@ class ThreadedEncryption
     pthread_t *threads;
     ThreadedEncryption(int direc,
                        unsigned char* key,
+                       unsigned char* iv,
                        int n_threads);
-
     ThreadedEncryption(){}
 
 

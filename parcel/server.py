@@ -29,39 +29,37 @@ class Server(object):
         self.server = lib.new_server()
         atexit.register(self.close)
 
-    def start(self, host='localhost', port=9000, sthread_args={}):
+    def start(self, host, port, uri, private_key, public_key):
         """
 
         """
+        self.uri = uri
+        self.private_key = private_key
+        self.public_key = public_key
 
         log.info('Starting server at {}:{}'.format(host, port))
         lib.server_start(self.server, str(host), str(port))
+
+        log.info('|-- {}: {}'.format('uri', uri))
+
         log.info('Server ready at {}:{}'.format(host, port))
-        self.sthread_args = sthread_args
-
-        log.info('ServerThread args:')
-        for key, value in sthread_args.items():
-            log.info('|-- {}: {}'.format(key, value))
-
-        # Check server thread args
-        assert 'data_server_url' in sthread_args
-        assert 'max_enc_threads' in sthread_args
-        assert 'buffer_processes' in sthread_args
-
         self.listen()
 
     def close(self):
         lib.server_close(self.server)
 
-    def server_thread(self, instance):
+    def server_thread(self, instance, uri, private_key):
         # try:
         #     log.info('New ServerThread: {}'.format(instance))
-        ServerThread(instance, **self.sthread_args)
+        ServerThread(instance, instance, uri, private_key)
         # except Exception, e:
         #     log.error('ServerThread exception: {}'.format(str(e)))
 
     def listen(self):
         while True:
             instance = lib.server_next_client(self.server)
-            t = Thread(target=self.server_thread, args=(instance,))
+            t = Thread(
+                target=self.server_thread,
+                args=(instance, self.uri, self.private_key)
+            )
             t.start()

@@ -435,7 +435,7 @@ EXTERN int read_data(ThreadedEncryption *decryptor, UDTSOCKET socket,
         cerr << "Invalid read." << endl;
         return total_read;
     }
-    decryptor->map_threaded(buff, buff, total_read);
+    decryptor->map(buff, buff, total_read);
     return total_read;
 }
 
@@ -443,14 +443,13 @@ EXTERN int read_size(ThreadedEncryption *decryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     int total_read;
-
     // Read data from UDT socket and check length
     if (len != (total_read = read_size_no_encryption(socket, buff, len))){
         cerr << "Invalid read: " << total_read << " != " << len << endl;
         return total_read;
     }
     // Decrypt the data in place
-    if (len != decryptor->map_threaded(buff, buff, total_read)){
+    if (len != decryptor->map(buff, buff, total_read)){
         cerr << "Invalid decrypt: " << total_read << " != " << len << endl;
         return total_read;
     }
@@ -462,7 +461,7 @@ EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
                      char *buff, int len)
 {
     // Encrypt the buffer in place
-    encryptor->map_threaded(buff, buff, len);
+    encryptor->map(buff, buff, len);
     // Send data over UDT socket
     int total_sent = send_data_no_encryption(socket, buff, len);
     // Check send length
@@ -478,12 +477,18 @@ EXTERN int send_data(ThreadedEncryption *encryptor, UDTSOCKET socket,
  *                        Encryption Wrappers
  ***********************************************************************/
 
-EXTERN ThreadedEncryption *encryption_init(char *key, int n_threads)
+EXTERN ThreadedEncryption *encryption_init(char *key, char *iv)
 {
-    return new ThreadedEncryption(EVP_ENCRYPT, (unsigned char*)key, n_threads);
+    return new ThreadedEncryption(EVP_ENCRYPT,
+                                  (unsigned char*)key,
+                                  (unsigned char*)iv,
+                                  0);
 }
 
-EXTERN ThreadedEncryption *decryption_init(char *key, int n_threads)
+EXTERN ThreadedEncryption *decryption_init(char *key, char *iv)
 {
-    return new ThreadedEncryption(EVP_DECRYPT, (unsigned char*)key, n_threads);
+    return new ThreadedEncryption(EVP_DECRYPT,
+                                  (unsigned char*)key,
+                                  (unsigned char*)iv,
+                                  0);
 }
