@@ -2,7 +2,7 @@
 import argparse
 import logging
 import os
-from parcel import manifest, HTTPClient
+from parcel import manifest, HTTPClient, UDTClient
 from parcel.log import get_logger
 
 logging.root.setLevel(logging.INFO)
@@ -11,7 +11,9 @@ log = get_logger('parcel_client')
 
 def get_client(args, token):
     if args.mode == 'udt':
-        raise NotImplementedError()
+        return UDTClient(
+            args.proxy_host, args.proxy_port,
+            args.server.pop(0), token, args.n_processes, args.dir)
     elif args.mode == 'http':
         return HTTPClient(
             args.server.pop(0), token, args.n_processes, args.dir)
@@ -73,6 +75,12 @@ if __name__ == '__main__':
 
     udt = subparsers.add_parser('udt', help='Download files via UDT',
                                 parents=[general_parser])
+    udt.add_argument('--proxy-host', default='localhost', type=str,
+                     dest='proxy_host',
+                     help='The port to bind the local proxy to')
+    udt.add_argument('--proxy-port', default='9000', type=str,
+                     dest='proxy_port',
+                     help='The port to bind the local proxy to')
 
     #############################################################
     #                      HTTP options
