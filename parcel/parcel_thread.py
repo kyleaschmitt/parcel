@@ -79,6 +79,7 @@ class ParcelThread(object):
             ss = lib.send_data_no_encryption(self.socket, to_send, size)
         if ss != size:
             raise RuntimeError('Unable to write to socket.')
+        return ss
 
     ############################################################
     #                     Transfer Functions
@@ -87,7 +88,7 @@ class ParcelThread(object):
     def send_payload_size(self, size, **send_args):
         buff = create_string_buffer(LEN_PAYLOAD_SIZE)
         buff.value = str(size)
-        self.send(buff, LEN_PAYLOAD_SIZE, **send_args)
+        return self.send(buff, LEN_PAYLOAD_SIZE, **send_args)
 
     def read_payload_size(self, **read_args):
         payload_size = int(self.read_size(LEN_PAYLOAD_SIZE, **read_args))
@@ -103,10 +104,10 @@ class ParcelThread(object):
         if size is None:
             size = len(payload)
         self.send_payload_size(size, **send_args)
-        self.send(payload, size, **send_args)
+        return self.send(payload, size, **send_args)
 
     def send_control(self, control, **send_args):
-        self.send_json({'CONTROL': control}, **send_args)
+        return self.send_json({'CONTROL': control}, **send_args)
 
     def recv_control(self, expected=None, **read_args):
         cntl_json = self.read_json(**read_args)
@@ -123,7 +124,7 @@ class ParcelThread(object):
 
     def send_json(self, doc, **send_args):
         payload = json.dumps(doc)
-        self.send_payload(payload, size=len(payload), **send_args)
+        return self.send_payload(payload, size=len(payload), **send_args)
 
     def read_json(self, **read_args):
         return json.loads(self.next_payload(**read_args))

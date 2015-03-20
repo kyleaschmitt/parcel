@@ -1,6 +1,7 @@
 import atexit
 import urlparse
-from threading import Thread
+from multiprocessing.pool import ThreadPool
+from multiprocessing import Manager, Process
 import requests
 
 from parcel import auth
@@ -20,6 +21,16 @@ log = get_logger('sthread')
 
 def write_to_socket(send, chunk):
     return send(chunk, inplace=True)
+
+
+def read_worker(q_out, url, headers):
+    r = requests.get(url, headers=headers, verify=False, stream=True)
+    # Then streaming of the data itself.
+    for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
+        if not chunk:
+            continue  # Empty are keep-alives.
+        q_out.put(chunk)
+    r.close()
 
 
 class ServerThread(ParcelThread):
@@ -123,13 +134,6 @@ class ServerThread(ParcelThread):
             'version': version
         }
 
-    def async_write(self, thread, chunk):
-        if thread:
-            print thread.join()
-        thread = Thread(target=self.send_payload, args=(chunk,))
-        thread.start()
-        return thread
-
     @state_method('event_loop')
     def download(self):
         request = self.read_json()
@@ -140,15 +144,17 @@ class ServerThread(ParcelThread):
         url = urlparse.urljoin(self.uri, file_id)
         headers = self.construct_header_with_range(start, end)
         log.debug('Reading range: [{}]'.format(headers.get('Range')))
-        r = requests.get(url, headers=headers, verify=False, stream=True)
 
-        # Then streaming of the data itself.
-        last_thread = None
-        for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
-            if not chunk:
-                continue  # Empty are keep-alives.
-            last_thread = self.async_write(last_thread, chunk)
-        r.close()
+        manager = Manager()
+        q = manager.Queue()
+
+        reader = Process(target=read_worker, args=(q, url, headers))
+        reader.start()
+
+        while True:
+            written = self.send(q.get())
+            if written < 0:
+                raise RuntimeError('Unable to write to socket.')
 
     def read_token(self):
         self.token = self.next_payload()
