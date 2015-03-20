@@ -1,15 +1,16 @@
-import time
-import os
-from multiprocessing.pool import ThreadPool, Pool
+from math import ceil
 from multiprocessing import Manager
-from parcel_thread import ParcelThread
-import Crypto
+from multiprocessing.pool import Pool
+from threading import Thread
+import os
+import requests
+import time
+import urlparse
 
+from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from const import STATE_IDLE, RES_CHUNK_SIZE
-from utils import (
-    print_download_information, set_file_length, get_pbar, state_method
-)
+from utils import print_download_information, set_file_length, get_pbar,\
+    write_offset, calculate_segments
 
 # Logging
 log = get_logger('client')
@@ -20,36 +21,126 @@ def download_worker(args):
     return client.try_retry_read_write_segment(path, segment, q_out)
 
 
-class Client(ParcelThread):
+class Client(object):
 
     def __init__(self, uri, token, n_procs, directory):
-        super(Client, self).__init__(None, None, None)
         self.token = token
         self.n_procs = n_procs
         self.uri = uri
         self.directory = directory
 
-    def get_segment_iterator(self, start, end, *args, **kwargs):
-        raise NotImplementedError()
+    ############################################################
+    #                          Util
+    ############################################################
 
-    def try_retry_read_write_segment(self, path, segment, retries=3):
-        raise NotImplementedError()
+    def split_file(self, size, blocks):
+        block_size = int(ceil(float(size)/blocks))
+        segments = calculate_segments(0, size, block_size)
+        return segments, block_size
 
-    def read_write_segment(self, path, segment):
-        raise NotImplementedError()
+    def check_transfer_size(self, actual, expected):
+        if actual != expected:
+            raise ValueError(
+                'Transfer size incorrect: {} != {} expected'.format(
+                    actual, expected))
 
-    def start_timer(self):
-        self.start_time = time.time()
+    def async_write(self, thread, path, chunk, offset):
+        """
+        Async write to a file with offset from the beginning.
 
-    def stop_timer(self, file_size=None, print_stats=True):
-        self.stop_time = time.time()
-        if file_size > 0 and print_stats:
-            rate = (int(file_size)*8/1e9) / (self.stop_time - self.start_time)
-            log.info('Download complete: {0:.2f} Gbps average'.format(rate))
+        If thread then join the last async write before continuing
+        """
+        if thread:
+            thread.join()
+        thread = Thread(target=write_offset, args=(path, chunk, offset))
+        thread.start()
+        return thread
+
+    ############################################################
+    #                          REST
+    ############################################################
+
+    def construct_header(self):
+        return {
+            'X-Auth-Token': self.token,
+        }
+
+    def construct_header_with_range(self, start, end):
+        header = self.construct_header()
+        header['Range'] = 'bytes={}-{}'.format(start, end)
+        # provide host because it's mandatory, range request
+        # may not work otherwise
+        scheme, host, path, params, q, frag = urlparse.urlparse(self.uri)
+        header['host'] = host
+        return header
+
+    def make_file_request(self, file_id, headers, verify=False, close=False):
+        """Make request for file, just get the header.
+
+        """
+        url = urlparse.urljoin(self.uri, file_id)
+        log.debug('Request to {}'.format(url))
+        r = requests.get(url, headers=headers, verify=verify, stream=True)
+        r.raise_for_status()
+        if close:
+            r.close()
+        return r
+
+    def request_file_information(self, file_id):
+        headers = self.construct_header()
+        r = self.make_file_request(file_id, headers, close=True)
+        size, name = self.parse_file_header(r, file_id)
+        return name, size
+
+    def parse_file_header(self, r, url):
+        """Send a header to the client.
+
+        :returns: The file size and name
+        """
+
+        size = long(r.headers['Content-Length'])
+        log.info('Request responded: {} bytes'.format(size))
+        attachment = r.headers.get('content-disposition', None)
+        file_name = attachment.split('filename=')[-1] if attachment else None
+        return size, file_name
 
     def get_file_path(self, file_name):
         return os.path.join(self.directory, '{}.{}'.format(
             self.file_id, file_name))
+
+    def read_write_segment(self, path, segment, q_out):
+        written = 0
+        write_thread = None
+        start, end = segment
+        log.debug('Initializing segment: {}-{}'.format(start, end))
+        header = self.construct_header_with_range(start, end)
+        r = self.make_file_request(self.file_id, header)
+        for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
+            if not chunk:
+                continue  # Empty are keep-alives.
+            # Write async to file
+            write_thread = self.async_write(
+                write_thread, path, chunk, start + written)
+            written += len(chunk)
+            q_out.put(len(chunk))  # for async reporting
+        self.check_transfer_size(end - start + 1, written)
+        return written
+
+    def try_retry_read_write_segment(self, path, segment, q_out, retries=3):
+        try:
+            return self.read_write_segment(path, segment, q_out)
+        except ValueError as e:
+            log.warn('Buffering error: {}'.format(str(e)))
+            if retries > 0:
+                return self.try_retry_read_write_segment(
+                    path, segment, q_out, retries-1)
+            else:
+                raise ValueError(
+                    'Max buffer retries exceeded: {}'.format(str(e)))
+
+    ############################################################
+    #                       Reporting
+    ############################################################
 
     def initialize_file_download(self, name, path, size):
         self.start_timer()
@@ -57,15 +148,27 @@ class Client(ParcelThread):
         set_file_length(path, size)
         self.pbar = get_pbar(self.file_id, size)
 
+    def update_file_download(self, received):
+        self.pbar.update(self.pbar.currval + received)
+
     def finalize_file_download(self, size, total_received):
         self.check_transfer_size(size, total_received)
         self.stop_timer(size)
         self.pbar.finish()
 
-    def update_file_download(self, received):
-        self.pbar.update(self.pbar.currval + received)
+    def start_timer(self):
+        self.start_time = time.time()
 
-    @state_method('handshake', 'download_files', 'download', STATE_IDLE)
+    def stop_timer(self, file_size=None):
+        self.stop_time = time.time()
+        if file_size > 0:
+            rate = (int(file_size)*8/1e9) / (self.stop_time - self.start_time)
+            log.info('Download complete: {0:.2f} Gbps average'.format(rate))
+
+    ############################################################
+    #                     Main download
+    ############################################################
+
     def download_files(self, file_ids, *args, **kwargs):
         """Download a list of files
 
@@ -87,16 +190,7 @@ class Client(ParcelThread):
 
         # Download each file
         for file_id in file_ids:
-            self.download_file(file_id)
-
-    @state_method('download_files', 'download_file', STATE_IDLE)
-    def download_file(self, file_id, print_stats=False,
-                      block_size=RES_CHUNK_SIZE):
-        file_size = self.parallel_download(file_id)
-        return file_size
-
-    def make_pickleable(self):
-        pass
+            self.parallel_download(file_id)
 
     def parallel_download(self, file_id, verify=False):
 
@@ -106,7 +200,7 @@ class Client(ParcelThread):
 
         # File informaion
         self.file_id = file_id
-        name, size = self.request_file_information()
+        name, size = self.request_file_information(file_id)
         path = self.get_file_path(name)
 
         # Create segments to stream
@@ -115,8 +209,7 @@ class Client(ParcelThread):
         args = ((self, path, segment, q) for segment in segments)
 
         # Divide work amongst process pool
-        pool = ThreadPool(self.n_procs, initializer=Crypto.Random.atfork())
-        self.make_pickleable()
+        pool = Pool(self.n_procs)
         async_result = pool.map_async(download_worker, args)
 
         # Monitor progress
