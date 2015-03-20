@@ -18,6 +18,10 @@ from version import version, compatible_versions
 log = get_logger('sthread')
 
 
+def write_to_socket(send, chunk):
+    return send(chunk, inplace=True)
+
+
 class ServerThread(ParcelThread):
 
     def __init__(self, instance, uri, private_key):
@@ -110,7 +114,6 @@ class ServerThread(ParcelThread):
             CNTL_FILE_INFO: self.send_file_info,
         }
         cntl = self.recv_control()
-
         if cntl not in switch:
             raise RuntimeError('Unknown control code {}'.format(cntl))
         switch[cntl]()
@@ -120,26 +123,32 @@ class ServerThread(ParcelThread):
             'version': version
         }
 
+    def async_write(self, thread, chunk):
+        if thread:
+            print thread.join()
+        thread = Thread(target=self.send_payload, args=(chunk,))
+        thread.start()
+        return thread
+
+    @state_method('event_loop')
     def download(self):
         request = self.read_json()
         file_id = request['file_id']
         name, size = self.request_file_information(file_id)
         start = request.get('start', 0)
-        end = request.get('start', size)
+        end = request.get('end', size)
         url = urlparse.urljoin(self.uri, file_id)
-        print url, start, end
-        # headers = self.construct_header_with_range(start, end)
-        # log.debug('Reading range: [{}]'.format(headers.get('Range')))
-        # r = requests.get(url, headers=headers, verify=False, stream=True)
-        # offset = start
-        # total_written = 0
-        # # Then streaming of the data itself.
-        # for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
-        #     if not chunk:
-        #         continue  # Empty are keep-alives.
-        #     yield chunk
-        #     offset += len(chunk)
-        #     total_written += len(chunk)
+        headers = self.construct_header_with_range(start, end)
+        log.debug('Reading range: [{}]'.format(headers.get('Range')))
+        r = requests.get(url, headers=headers, verify=False, stream=True)
+
+        # Then streaming of the data itself.
+        last_thread = None
+        for chunk in r.iter_content(chunk_size=RES_CHUNK_SIZE):
+            if not chunk:
+                continue  # Empty are keep-alives.
+            last_thread = self.async_write(last_thread, chunk)
+        r.close()
 
     def read_token(self):
         self.token = self.next_payload()
