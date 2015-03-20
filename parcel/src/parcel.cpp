@@ -322,14 +322,15 @@ EXTERN UDTSOCKET client_get_socket(Client *client){
     return client->client;
 }
 
-EXTERN long long client_recv_file(ThreadedEncryption *decryptor, Client *client,
-                                  char *path, int64_t size,
-                                  int64_t block_size, int print_stats)
+EXTERN int64_t client_recv_file(ThreadedEncryption *decryptor, Client *client,
+                                char *path, int64_t size, int64_t offset,
+                                int64_t block_size)
 {
     char *buffer = new char[block_size];
 
     // Open the output file
-    fstream ofs(path, ios::out | ios::binary | ios::trunc);
+    fstream ofs(path, ios::out | ios::binary);
+    ofs.seekp(offset);
 
     // Set information on the client for external monitoring
     client->downloaded = 0;

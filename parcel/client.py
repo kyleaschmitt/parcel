@@ -1,8 +1,9 @@
 import time
 import os
-from multiprocessing.pool import Pool
+from multiprocessing.pool import ThreadPool
 from multiprocessing import Manager
 from parcel_thread import ParcelThread
+from Crypto import Random
 
 from log import get_logger
 from const import STATE_IDLE, RES_CHUNK_SIZE
@@ -94,6 +95,9 @@ class Client(ParcelThread):
         file_size = self.parallel_download(file_id)
         return file_size
 
+    def make_pickleable(self):
+        pass
+
     def parallel_download(self, file_id, verify=False):
 
         # Process management
@@ -111,14 +115,16 @@ class Client(ParcelThread):
         args = ((self, path, segment, q) for segment in segments)
 
         # Divide work amongst process pool
-        pool = Pool(self.n_procs)
-        async_result = pool.map_async(download_worker, args)
+        pool = ThreadPool(self.n_procs)
+        self.make_pickleable()
+        # async_result = pool.map_async(download_worker, args)
+        map(download_worker, args)
 
-        # Monitor progress
-        while self.pbar.currval < size:
-            self.update_file_download(q.get())
+        # # Monitor progress
+        # while self.pbar.currval < size:
+        #     self.update_file_download(q.get())
 
-        # Finalize download
-        total_received = sum(async_result.get())
-        self.finalize_file_download(size, total_received)
-        return total_received
+        # # Finalize download
+        # total_received = sum(async_result.get())
+        # self.finalize_file_download(size, total_received)
+        # return total_received
