@@ -33,18 +33,6 @@ def get_pbar(file_id, maxval):
     return pbar
 
 
-def monitor_transfer(client, file_id, total_size):
-    pbar = get_pbar('File: {}'.format(file_id), total_size)
-    time.sleep(1)
-    while (lib.get_client_live(client.instance)):
-        try:
-            pbar.update(lib.get_client_downloaded(client.instance))
-        except:
-            pass
-        time.sleep(1)
-    pbar.finish()
-
-
 def print_download_information(file_id, size, name, path):
     log.info('-'*40)
     log.info('Starting download   : {}'.format(file_id))

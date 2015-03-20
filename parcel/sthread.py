@@ -151,7 +151,7 @@ class ServerThread(ParcelThread):
         reader = Process(target=read_worker, args=(q, url, headers))
         reader.start()
 
-        while True:
+        while reader.is_alive():
             written = self.send(q.get())
             if written < 0:
                 raise RuntimeError('Unable to write to socket.')
