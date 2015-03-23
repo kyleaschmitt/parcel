@@ -18,7 +18,8 @@ log = get_logger('client')
 
 def download_worker(args):
     client, file_id, path, segment, q_out = args
-    return client.try_retry_read_write_segment(3, file_id, path, segment, q_out)
+    return client.try_retry_read_write_segment(
+        3, file_id, path, segment, q_out)
 
 
 class Client(object):
@@ -29,8 +30,8 @@ class Client(object):
         :param str uri:
             The uri path [scheme://server:port/path] of the remote server
         :param str token:
-            The authentication token that will be added to the HTTP X-Auth-Token
-            header
+            The authentication token that will be added to the HTTP
+            X-Auth-Token header
         :param int n_procs:
             The number of processes to use in download
         :param str directory:
@@ -85,7 +86,7 @@ class Client(object):
         :param Thread thread: The result of a previous async_write to block on
         :param str path: The path to the file to write to
         :param str chunk: The string-like object to write to file
-        :param int offset: The offset from the beginning of the file to write to
+        :param int offset: The offset from the beginning of the file
         :returns: A python Thread object that was spawned to write to the file
 
         """
@@ -101,7 +102,8 @@ class Client(object):
 
     def construct_header(self, start=None, end=None):
         """Return a standard header for any parcel HTTP request.  If ``start``
-        and ``end`` are specified, then the header will contain a Range request.
+        and ``end`` are specified, then the header will contain a Range
+        request.
 
         :param int start: optional. The beginning of the range interval
         :param int end: optional.
@@ -168,7 +170,7 @@ class Client(object):
 
         """
 
-        return os.path.join(self.directory, '{}__{}'.format(
+        return os.path.join(self.directory, '{}_{}'.format(
             file_id, file_name))
 
     def read_write_segment(self, file_id, path, segment, q_out):
@@ -220,7 +222,8 @@ class Client(object):
             if retries <= 0:
                 raise ValueError(
                     'Max buffer retries exceeded: {}'.format(str(e)))
-            return self.try_retry_read_write_segment(retries-1, *args, **kwargs)
+            return self.try_retry_read_write_segment(
+                retries-1, *args, **kwargs)
 
     ############################################################
     #                       Reporting
