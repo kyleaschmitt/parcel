@@ -6,7 +6,7 @@ setup(
     install_requires=[
         'requests==2.6.0',
         'progressbar==2.2',
-        'Flask=0.10.1',
+        'Flask==0.10.1',
     ],
     scripts=[
         'bin/parcel',
