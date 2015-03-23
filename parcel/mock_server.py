@@ -2,9 +2,10 @@ from flask import Flask, request, make_response
 import mmap
 import os
 import contextlib
+import tempfile
 
 app = Flask(__name__)
-directory = '/tmp/'
+directory = tempfile.gettempdir()
 
 
 def send_range(f, file_id, ranges):
