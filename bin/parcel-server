@@ -11,30 +11,24 @@ def main(args):
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
 
-    sthread_args = {
-        'data_server_url': args.data_server_url,
-        'max_enc_threads': args.max_threads,
-        'buffer_processes': args.buffer_processes,
-    }
-
     server = parcel.Server()
-    server.start(host=args.host, port=args.port, sthread_args=sthread_args)
+    server.start(
+        host=args.host,
+        port=args.port,
+        uri=args.server.pop(0),
+    )
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--data-server-url', required=True, type=str,
-                        help='location of data server')
+    parser.add_argument('server', metavar='server', type=str, nargs=1,
+                        help='The url path of the data server')
     parser.add_argument('-p', '--port', default=9000, type=int,
                         help='parcel server port')
     parser.add_argument('-i', '--host', default='localhost', type=str,
                         help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
-    parser.add_argument('-n', '--max-threads', type=int, default=4,
-                        help='encryption threads to grant client')
-    parser.add_argument('-b', '--buffer_processes', type=int, default=8,
-                        help='Number of processes to use for async buffering from API')
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     main(args)
