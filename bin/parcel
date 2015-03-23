@@ -29,7 +29,7 @@ def main(args):
     # Create file list and remove duplicates
     file_ids = set([f['id'] for f in args.manifest] + args.file_ids)
     # Download files
-    client.download_files(file_ids, directory=args.dir)
+    client.download_files(file_ids)
 
 
 if __name__ == '__main__':
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                                 nargs='*', help='uuids to download')
 
     token_args = general_parser.add_mutually_exclusive_group(required=False)
-    token_args.add_argument('-t', '--token-file', default='',
+    token_args.add_argument('-t', '--token-file',
                             type=lambda x: argparse.FileType('r')(x).read(),
                             dest='token',
                             help='authentication token file')
@@ -88,5 +88,10 @@ if __name__ == '__main__':
 
     http = subparsers.add_parser('http', help='Download files via HTTP',
                                  parents=[general_parser])
+
+    #############################################################
+    #                       Start client
+    #############################################################
+
     args = parser.parse_args()
     main(args)

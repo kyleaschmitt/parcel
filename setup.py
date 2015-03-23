@@ -4,9 +4,8 @@ setup(
     name='parcel',
     packages=["parcel"],
     install_requires=[
-        'requests',
+        'requests==2.6.0',
         'progressbar==2.2',
-        'pycrypto==2.6.1',
     ],
     scripts=[
         'bin/parcel',
