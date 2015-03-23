@@ -12,6 +12,42 @@ Contents:
    :maxdepth: 2
 
 
+:mod:`client`
+-------------
+
+Parcel base client module.
+
+
+Methods
++++++++
+
+.. autoclass:: parcel.client.Client
+   :members:
+
+:mod:`HTTPClient`
+-----------------
+
+Parcel HTTP client module.
+
+
+Methods
++++++++
+
+.. autoclass:: parcel.HTTPClient
+   :members:
+
+
+:mod:`UDTClient`
+----------------
+
+Parcel UDT client module.
+
+
+Methods
++++++++
+
+.. autoclass:: parcel.UDTClient
+   :members:
 
 Indices and tables
 ==================
@@ -19,4 +55,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
