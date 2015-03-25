@@ -1,6 +1,8 @@
 C++ = g++
 
-INSTALL_PATH := /usr/local/lib
+INSTALL_PATH = $(HOME)/.parcel/lib
+MKDIR = mkdir -p
+CP = cp
 
 ifndef os
    os = LINUX
@@ -46,6 +48,8 @@ ifneq ($(os), OSX)
 else
 	$(C++) -dynamiclib -o libudt.dylib -lstdc++ -lpthread -lm $^
 endif
+	$(MKDIR) -p $(INSTALL_PATH)
+	$(CP) libudt.so $(INSTALL_PATH)/libudt.so
 
 libudt.a: $(OBJS)
 	ar -rcs $@ $^

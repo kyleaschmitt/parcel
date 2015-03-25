@@ -3,7 +3,7 @@ import os
 from ctypes import cdll, CFUNCTYPE, c_void_p, c_int, c_longlong
 
 # Load library
-INSTALL_PATH = '/usr/local/lib/'
+INSTALL_PATH = os.path.join('/usr', 'local', 'lib')
 _lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
 
 # Signal handling for external calls
@@ -22,6 +22,5 @@ class ParcelDLL(object):
         self.tcp2udt_start = _lib.tcp2udt_start
         self.tcp2udt_start.argtypes = (c_void_p, c_void_p, c_void_p, c_void_p)
         self.tcp2udt_start.restype = c_int
-
 
 lib = ParcelDLL()

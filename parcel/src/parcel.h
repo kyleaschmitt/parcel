@@ -21,7 +21,8 @@
 #endif
 #include <iostream>
 #include <assert.h>
-#include <udt.h>
+
+#include <udt4>
 
 /******************************************************************************/
 #define BUFF_SIZE 67108864

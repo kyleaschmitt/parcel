@@ -1,9 +1,6 @@
 #!/bin/bash
 
 set -e
-cd parcel/lib/udt4
-sudo make install
-cd ../../../
 make
-sudo make install
+sudo -E make install
 sudo -E $(which python) setup.py install

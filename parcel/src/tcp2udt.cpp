@@ -5,6 +5,7 @@
  *
  *****************************************************************************/
 #include "parcel.h"
+#include "simclist.h"
 
 
 int tcp2udt_start(char *local_host, char *local_port,
@@ -214,6 +215,8 @@ void *thread_tcp2udt(void *_args_)
      */
     debug("Waiting on TCP socket ready");
     while (!args->tcp_socket){
+        // TODO: Add semaphore on socket ready, pthread_yield is a
+        // lazy solution for now
         pthread_yield();
     }
     debug("TCP socket ready: %d", args->tcp_socket);
@@ -258,20 +261,14 @@ void *thread_tcp2udt(void *_args_)
         return NULL;
     }
 
-    /* Create pipe to TCP thread */
-    pthread_t pipe2udt_thread;
+    /* Create pipe to TCP args */
     udt_pipe_args_t *pipe2udt_args = (udt_pipe_args_t*)malloc(sizeof(udt_pipe_args_t));
     pipe2udt_args->udt_socket = args->udt_socket;
     pipe2udt_args->pipe = pipefd[0];
-    debug("Creating pipe2udt thread");
-    if (pthread_create(&pipe2udt_thread, NULL, pipe2udt, pipe2udt_args)){
-        perror("unable to create pipe2udt thread");
-        free(args);
-        return NULL;
-    }
+    debug("Calling pipe2udt");
+    pipe2udt(pipe2udt_args);  // There is no reason not to block on this now
 
     void *ret;
-    pthread_join(pipe2udt_thread, &ret);
     pthread_join(tcp2pipe_thread, &ret);
 
     return NULL;

@@ -1,4 +1,4 @@
-DIRS = src lib/udt4
+DIRS = src
 TARGETS = all clean install uninstall
 
 $(TARGETS): %: $(patsubst %, %.%, $(DIRS))

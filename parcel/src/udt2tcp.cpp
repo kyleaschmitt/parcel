@@ -5,6 +5,7 @@
  *
  *****************************************************************************/
 #include "parcel.h"
+#include "simclist.h"
 
 
 EXTERN int udt2tcp_start(char *local_host, char *local_port,
@@ -242,22 +243,16 @@ void *thread_udt2tcp(void *_args_)
         return NULL;
     }
 
-    /* Create pipe to TCP thread */
-    pthread_t pipe2tcp_thread;
+    /* Create pipe to TCP args */
     tcp_pipe_args_t *pipe2tcp_args = (tcp_pipe_args_t*)malloc(sizeof(tcp_pipe_args_t));
     pipe2tcp_args->tcp_socket = args->tcp_socket;
     pipe2tcp_args->pipe = pipefd[0];
-    debug("Creating pipe2tcp thread");
-    if (pthread_create(&pipe2tcp_thread, NULL, pipe2tcp, pipe2tcp_args)){
-        error("unable to create pipe2udt thread");
-        free(args);
-        return NULL;
-    }
+    debug("Calling pipe2tcp thread");
+    pipe2tcp(pipe2tcp_args);  // There is no reason not to block on this now
 
-    /* Join transcriber threads */
+    /* Join transcriber thread */
     void *ret;
     pthread_join(udt2pipe_thread, &ret);
-    pthread_join(pipe2tcp_thread, &ret);
 
     return NULL;
 }

@@ -6,6 +6,7 @@
  *****************************************************************************/
 #include "parcel.h"
 
+
 void *udt2pipe(void *_args_)
 {
     /*
@@ -30,7 +31,7 @@ void *udt2pipe(void *_args_)
         /* Write to pipe */
         debug("Writing %d bytes to pipe", read_size);
         if (write(args->pipe, buffer, read_size) <= 0){
-            error(": Failed to write to pipe.");
+            debug("Failed to write to pipe.");
             goto cleanup;
         }
         debug("Writing %d bytes to pipe", read_size);
@@ -62,7 +63,7 @@ void *tcp2pipe(void *_args_)
 
         /* Write to pipe */
         if (write(args->pipe, buffer, read_size) <= 0){
-            error("Failed to write to pipe");
+            debug("Failed to write to pipe");
             goto cleanup;
         }
         debug("Wrote %d bytes to pipe", read_size);
