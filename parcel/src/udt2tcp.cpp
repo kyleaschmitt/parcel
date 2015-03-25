@@ -1,7 +1,8 @@
 /******************************************************************************
  *
  * FILE    : udt2tcp.cpp
- * AUTHOR  : Joshua Miller                       _
+ * AUTHOR  : Joshua Miller
+ *           jshuasmiller@gmail.com              _
  * PROJECT : parcel                             | |
  *                      _ __   __ _ _ __ ___ ___| |
  *                     | '_ \ / _` | '__/ __/ _ \ |
@@ -45,7 +46,6 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
      *  Incomming connections get their own thread and a proxied
      *  connection to remote_host:remote_port.
      */
-
     log("Proxy binding to local UDT socket [%s:%s] to remote TCP [%s:%s]",
         local_host, local_port, remote_host, remote_port);
 

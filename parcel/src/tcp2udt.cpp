@@ -1,7 +1,8 @@
 /******************************************************************************
  *
  * FILE    : tcp2udt.cpp
- * AUTHOR  : Joshua Miller                       _
+ * AUTHOR  : Joshua Miller
+ *           jshuasmiller@gmail.com              _
  * PROJECT : parcel                             | |
  *                      _ __   __ _ _ __ ___ ___| |
  *                     | '_ \ / _` | '__/ __/ _ \ |
@@ -12,7 +13,7 @@
  *
  * DESCRIPTION : This file contains functions for creating a TCP
  *               server that accpts incomming connections, creates a
- *               UDT  connection to remote server, and proxies the
+ *               UDT connection to remote server, and proxies the
  *               traffic through.
  *
  * LICENSE : Licensed under the Apache License, Version 2.0 (the

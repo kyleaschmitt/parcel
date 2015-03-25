@@ -1,7 +1,8 @@
 /******************************************************************************
  *
  * FILE    : transcribers.cpp
- * AUTHOR  : Joshua Miller                       _
+ * AUTHOR  : Joshua Miller
+ *           jshuasmiller@gmail.com              _
  * PROJECT : parcel                             | |
  *                      _ __   __ _ _ __ ___ ___| |
  *                     | '_ \ / _` | '__/ __/ _ \ |
