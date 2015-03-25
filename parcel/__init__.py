@@ -1,2 +1,3 @@
 from server import Server
-from client import UDTClient, HTTPClient
+from http_client import HTTPClient
+from udt_client import UDTClient

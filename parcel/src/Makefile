@@ -1,17 +1,80 @@
-C++ = g++
+C++ := g++
+GCC := gcc
 
-CCFLAGS = -Wall -D$(os) -I../../udt/src -finline-functions -g\
-	 -lcrypto -lopenssl -D_LARGE_FILE_SOURCE=1 -fPIC
-LINK_FLAGS = -shared -Wl,-soname,lparcel.so
-DIR = $(shell pwd)
-INSTALL_PATH = /usr/local/lib
 APP = parcel
-APPOUT = parcel
-mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-current_dir := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
-so_path := $(abspath $(dir mkfile_path))/lparcel.so
-LIBS = -lssl -lcrypto -ludt
-LDFLAGS = -L../../udt/src -lstdc++ -lpthread -lm -g
+
+################################################################################
+# Paths
+################################################################################
+# The path where the libraries will be installed
+  INSTALL_PATH    = /usr/local/lib
+# The name of the library
+  SO_NAME         = lparcel.so
+# The full instal path of the library
+  SO_PATH         = $(abspath $(dir mkfile_path))/$(SO_NAME)
+# Include directories
+  INC_DIRS        = udt4/src simclist
+
+################################################################################
+# UDT
+################################################################################
+# The udt source directory
+  UDT_DIR         = udt4/src
+# The udt library name
+  UDT_LIB         = libudt.so
+# Construct the full path to local udt library
+  UDT_OBJECTS     = $(patsubst %,$(UDT_DIR)/%,$(UDT_LIB))
+# Construct the full path to installed udt library
+  INST_UDT_OBJ    = $(patsubst %,$(INSTALL_PATH)/%,$(UDT_LIB))
+
+################################################################################
+# Clist
+################################################################################
+# C linked list directory
+  CLIST_DIR       = simclist
+# C linked list objects
+  CLIST_OBJS      = simclist.o
+# Construct the full path to installed simclist library
+  CLIST_OBJECTS   = $(patsubst %,$(CLIST_DIR)/%,$(CLIST_OBJS))
+
+################################################################################
+# Dependencies
+################################################################################
+# Construct all depencency paths
+  DEP_DIRS        = $(CLIST_PATH)
+# Construct all depencency objects
+  DEP_OBJS        = $(CLIST_OBJECTS)
+
+################################################################################
+# Compiler flags
+################################################################################
+# Construct include flags from INC_DIRS and dependencies
+  INCLUDES        = $(patsubst %,-I%,$(INC_DIRS)) $(patsubst %,-I%,$(DEPENDENCIES))
+# Optimization flags
+  OPTFLAGS        = -finline-functions -O3
+# Error flags
+  ERRFLAGS        = -Wall
+# File system flags
+  FSFLAGS         = -D_LARGE_FILE_SOURCE=1
+# Misc flags
+  MISCFLAGS       = -g -fPIC -static
+# Construct compiler flags
+  CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
+# LD linkning flags
+  LDFLAGS         = -lstdc++ -lpthread -lm -ludt $(patsubst %,-L%,$(INC_DIRS))
+# Other linking flags
+  LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
+# Non-standard libraries
+  LIBS            = -ludt -L$(UDT_DIR)
+
+################################################################################
+# Library objects
+################################################################################
+OBJECTS         = $(DEP_OBJS) transcribers.o udt2tcp.o tcp2udt.o
+
+################################################################################
+# OS options
+################################################################################
 
 ifndef os
    os = LINUX
@@ -22,7 +85,7 @@ ifndef arch
 endif
 
 ifeq ($(arch), IA32)
-    CCFLAGS += -DIA32 #-mcpu=pentiumpro -march=pentiumpro -mmmx -msse
+    CCFLAGS += -DIA32
 endif
 
 ifeq ($(arch), POWERPC)
@@ -45,20 +108,40 @@ ifeq ($(os), SUNOS)
    LDFLAGS += -lrt -lsocket
 endif
 
-all: parcel
+################################################################################
+# Build library
+################################################################################
+
+all: $(APP)
+
+%.o: %.c
+	$(GCC) $(CCFLAGS) $(LDFLAGS) $< -o $@ -c
 
 %.o: %.cpp
-	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c -static
+	$(C++) $(CCFLAGS) $(LDFLAGS) $< -o $@ -c
 
-parcel: parcel.o crypto.o
-	$(C++) $(LINK_FLAGS) -o $(so_path) $(INSTALL_PATH)/libudt.so parcel.o crypto.o $(LIBS)
+parcel: $(OBJECTS)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(UDT_OBJECTS) $(OBJECTS) $(LIBS)
+
+################################################################################
+# Build dependencies
+################################################################################
+
+udt4/src/libudt.so:
+	make -C udt4/src
+
+################################################################################
+# Manage library
+################################################################################
 
 clean:
-	rm -f *.o lparcel.so parcel.a libudt.so
+	rm -f $(OBJECTS) $(CLIST_OBJ) $(SO_NAME)
 
 install:
-	export PATH=$(DIR):$$PATH
-	cp lparcel.so $(INSTALL_PATH)/lparcel.so
+	cp $(UDT_OBJECTS) $(INST_UDT_OBJ)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INST_UDT_OBJ) $(OBJECTS) $(LIBS)
+	cp $(SO_PATH) $(INSTALL_PATH)/$(SO_NAME)
+	ldconfig
 
 uninstall:
-	rm $(INSTALL_PATH)/lparcel.so
+	rm $(INSTALL_PATH)/$(SO_NAME)

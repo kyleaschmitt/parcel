@@ -1,24 +1,7 @@
-INSTALL_DIR = /usr/local/lib
+DIRS = parcel
+TARGETS = all clean install uninstall
 
-all:
-	make -C udt
-	make install -C udt
-	make -C parcel
+$(TARGETS): %: $(patsubst %, %.%, $(DIRS))
 
-parcel: all
-
-udt:
-	make -C udt
-
-install:
-	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
-	make install -C parcel
-
-uninstall:
-	make uninstall -C parcel
-
-clean:
-	make clean -C udt
-	make clean -C parcel
-
-.PHONY: install uninstall
+$(foreach TGT, $(TARGETS), $(patsubst %, %.$(TGT), $(DIRS))):
+	$(MAKE) -C $(subst ., , $@)

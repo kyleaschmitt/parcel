@@ -1,5 +1,9 @@
 C++ = g++
 
+INSTALL_PATH = $(HOME)/.parcel/lib
+MKDIR = mkdir -p
+CP = cp
+
 ifndef os
    os = LINUX
 endif
@@ -32,9 +36,8 @@ endif
 
 OBJS = api.o buffer.o cache.o ccc.o channel.o common.o core.o epoll.o list.o md5.o packet.o queue.o window.o
 DIR = $(shell pwd)
-INSTALL_DIR = /usr/local/lib
 
-all: libudt.a libudt.so udt
+all: libudt.so libudt.a udt
 
 %.o: %.cpp %.h udt.h
 	$(C++) $(CCFLAGS) $< -c
@@ -45,6 +48,8 @@ ifneq ($(os), OSX)
 else
 	$(C++) -dynamiclib -o libudt.dylib -lstdc++ -lpthread -lm $^
 endif
+	$(MKDIR) -p $(INSTALL_PATH)
+	$(CP) libudt.so $(INSTALL_PATH)/libudt.so
 
 libudt.a: $(OBJS)
 	ar -rcs $@ $^
@@ -56,5 +61,5 @@ clean:
 	rm -f *.o *.so *.dylib *.a udt
 
 install:
-	export LD_LIBRARY_PATH=:$(INSTALL_DIR):$$LD_LIBRARY_PATH
-	sudo cp libudt.so $(INSTALL_DIR)/libudt.so
+	export LD_LIBRARY_PATH=$(DIR):$$LD_LIBRARY_PATH
+	cp libudt.so $(INSTALL_PATH)/libudt.so

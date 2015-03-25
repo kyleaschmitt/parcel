@@ -1,46 +1,51 @@
 ## Synopsis
 
-Parcel is a high speed download client that leverages the speed of UDP without sacrificing reliability.  It is written on top of the UDT protocol and bound to a python interface.  Parcel's software is comprised of a *parcel-server* and a *parcel* client.  
+A high performance HTTP download client that leverages the speed of UDP without sacrificing reliability.
 
-The server is given a local REST endpoint with access to data.  The client connects to the server, providing any authentication information to proxy through to the REST endpoint.  The server then proxies the data back with a parallel HTTP/S buffer from the REST endpoint over UDT.
+Parcel is written on top of the UDT protocol and bound to a python interface.  Parcel's software is comprised of a *parcel-server* and a *parcel* client.  
+
+## Usage
+
+#### Using UDT
+
+The client can be run in conjunction with a parcel server, or without one.  The advantage of running the client with the server is the UDT proxy layer.  The server is given a local REST endpoint with access to data.  The client UDT connection to the server is translated to a local TCP connection and the data is proxied back using UDT.  
+
+#### Usin TCP
+
+Using the `http` option is alternative to running the client against a server with the `udt` option.  It can be run directly against a REST api without any additional server. Using this method, you are likely to see decreased performance over high latency networks.
 
 ## Example Usage
 
 ```
-ubuntu$ parcel --host parcel.server.host 10G -t token_file
-[2015-03-15 11:41:33,271][  client][   INFO] Connecting to server at parcel.server.host:9000
-[2015-03-15 11:41:33,274][  client][   INFO] Requesting 4 encryption threads
-[2015-03-15 11:41:33,275][  client][   INFO] Waiting for response...
-[2015-03-15 11:41:33,276][  client][   INFO] Encryption threads granted. Server will provide up to 4 threads.
-[2015-03-15 11:41:33,278][  client][   INFO] Found file id: 10G
-[2015-03-15 11:41:33,285][  client][   INFO] ----------------------------------------
-[2015-03-15 11:41:33,285][  client][   INFO] Starting download   : 10G
-[2015-03-15 11:41:33,285][  client][   INFO] ----------------------------------------
-[2015-03-15 11:41:33,285][  client][   INFO] File name           : None
-[2015-03-15 11:41:33,285][  client][   INFO] Download size       : 10737418240
-[2015-03-15 11:41:33,286][  client][   INFO] Downloading file to : /home/ubuntu/10G
+❯ parcel http -t token_file api.server.host file1 file2
+```
+OR
+```
+❯ parcel udt -t token_file parcel.server.host file1 file2
 ```
 
 ## Motivation
 
 TCP is the most widely used reliable network transport protocol. However, over high performance, wide area networks, TCP has been show to reach a bottleneck before UDP. 
 
-UDT (UDP Based Data transfer) is a reliable application level protocol for transferring bulk data over wide area networks. Parcel
+UDT (UDP Based Data transfer) is a reliable application level protocol for transferring bulk data over wide area networks. 
 
 ## Dependencies
 
-- OpenSSL (libssl and libcrypto)
 - [Python 2.7+](http://python.org/)
-- [Postgresql 9.4](http://www.postgresql.org/download/)
 
 ## Installation
 
 To install both the server and the client, simply run (preferrably in a python virtual environment):
 ```
-❯ cd parcel
-❯ ./install
+❯ python setup.py install
 ```
 
 ## Tests
 
-Are currently being developed.
+To run the tests:
+
+```
+❯ pip install pytest
+❯ py.test
+```

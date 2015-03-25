@@ -2,5 +2,5 @@
 
 set -e
 make
-make install
+sudo -E make install
 sudo -E $(which python) setup.py install
