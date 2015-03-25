@@ -2,6 +2,7 @@ from log import get_logger
 from client import Client
 import urlparse
 from cparcel import lib
+from multiprocessing import Process
 
 # Logging
 log = get_logger('client')
@@ -35,4 +36,5 @@ class UDTClient(Client):
         port = p.port or {'https': '443', 'http': '80'}[p.scheme]
         log.info('Binding proxy server {}:{} -> {}:{}'.format(
             proxy_host, proxy_port, p.hostname, port))
-        raise NotImplementedError('TODO: proxy bindings')
+        proxy = Process(lib.tcp2udt_start, args=(
+            proxy_host, proxy_port, p.hostname, port))

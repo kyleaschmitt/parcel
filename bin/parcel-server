@@ -13,9 +13,9 @@ def main(args):
 
     server = parcel.Server()
     server.start(
-        host=args.host,
-        port=args.port,
-        uri=args.server.pop(0),
+        proxy_host=args.host,
+        proxy_port=args.port,
+        remote_uri=args.server.pop(0),
     )
 
 
@@ -25,7 +25,7 @@ if __name__ == '__main__':
                         help='The url path of the data server')
     parser.add_argument('-p', '--port', default=9000, type=int,
                         help='parcel server port')
-    parser.add_argument('-i', '--host', default='localhost', type=str,
+    parser.add_argument('-i', '--host', default='0.0.0.0', type=str,
                         help='parcel server port')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='verbose logging')
