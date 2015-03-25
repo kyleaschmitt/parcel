@@ -6,43 +6,66 @@ APP = parcel
 ################################################################################
 # Paths
 ################################################################################
-INSTALL_PATH    = /usr/local/lib
-SO_NAME         = lparcel.so
-SO_PATH         = $(abspath $(dir mkfile_path))/$(SO_NAME)
-INC_DIRS        = udt4/src simclist
+# The path where the libraries will be installed
+  INSTALL_PATH    = /usr/local/lib
+# The name of the library
+  SO_NAME         = lparcel.so
+# The full instal path of the library
+  SO_PATH         = $(abspath $(dir mkfile_path))/$(SO_NAME)
+# Include directories
+  INC_DIRS        = udt4/src simclist
 
 ################################################################################
 # UDT
 ################################################################################
-UDT_DIR         = udt4/src
-UDT_OBJS        = libudt.so
-UDT_OBJECTS     = $(patsubst %,$(UDT_DIR)/%,$(UDT_OBJS))
+# The udt source directory
+  UDT_DIR         = udt4/src
+# The udt library name
+  UDT_LIB         = libudt.so
+# Construct the full path to local udt library
+  UDT_OBJECTS     = $(patsubst %,$(UDT_DIR)/%,$(UDT_LIB))
+# Construct the full path to installed udt library
+  INST_UDT_OBJ    = $(patsubst %,$(INSTALL_PATH)/%,$(UDT_LIB))
 
 ################################################################################
 # Clist
 ################################################################################
-CLIST_DIR       = simclist
-CLIST_OBJS      = simclist.o
-CLIST_OBJECTS   = $(patsubst %,$(CLIST_DIR)/%,$(CLIST_OBJS))
+# C linked list directory
+  CLIST_DIR       = simclist
+# C linked list objects
+  CLIST_OBJS      = simclist.o
+# Construct the full path to installed simclist library
+  CLIST_OBJECTS   = $(patsubst %,$(CLIST_DIR)/%,$(CLIST_OBJS))
 
 ################################################################################
 # Dependencies
 ################################################################################
-DEP_DIRS        = $(CLIST_PATH)
-DEP_OBJS        = $(CLIST_OBJECTS)
+# Construct all depencency paths
+  DEP_DIRS        = $(CLIST_PATH)
+# Construct all depencency objects
+  DEP_OBJS        = $(CLIST_OBJECTS)
 
 ################################################################################
 # Compiler flags
 ################################################################################
-INCLUDES        = $(patsubst %,-I%,$(INC_DIRS)) $(patsubst %,-I%,$(DEPENDENCIES))
-OPTFLAGS        = -finline-functions -O3
-ERRFLAGS        = -Wall
-FSFLAGS         = -D_LARGE_FILE_SOURCE=1
-MISCFLAGS       = -g -fPIC -static
-CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
-LDFLAGS         = -lstdc++ -lpthread -lm -ludt $(patsubst %,-L%,$(INC_DIRS))
-LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
-LIBS            = -ludt -L$(UDT_DIR)
+# Construct include flags from INC_DIRS and dependencies
+  INCLUDES        = $(patsubst %,-I%,$(INC_DIRS)) $(patsubst %,-I%,$(DEPENDENCIES))
+# Optimization flags
+  OPTFLAGS        = -finline-functions -O3
+# Error flags
+  ERRFLAGS        = -Wall
+# File system flags
+  FSFLAGS         = -D_LARGE_FILE_SOURCE=1
+# Misc flags
+  MISCFLAGS       = -g -fPIC -static
+# Construct compiler flags
+  CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
+# LD linkning flags
+  LDFLAGS         = -lstdc++ -lpthread -lm -ludt $(patsubst %,-L%,$(INC_DIRS))
+# Other linking flags
+  LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
+# Non-standard libraries
+  LIBS            = -ludt -L$(UDT_DIR)
 
 ################################################################################
 # Library objects
@@ -98,7 +121,7 @@ all: $(APP)
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -o $@ -c
 
 parcel: $(OBJECTS)
-	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(UDT_DIR)/libudt.so $(OBJECTS) $(LIBS)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(UDT_OBJECTS) $(OBJECTS) $(LIBS)
 
 ################################################################################
 # Build dependencies
@@ -115,8 +138,8 @@ clean:
 	rm -f $(OBJECTS) $(CLIST_OBJ) $(SO_NAME)
 
 install:
-	cp $(UDT_DIR)/libudt.so $(INSTALL_PATH)/libudt.so
-	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INSTALL_PATH)/libudt.so $(OBJECTS) $(LIBS)
+	cp $(UDT_OBJECTS) $(INST_UDT_OBJ)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INST_UDT_OBJ) $(OBJECTS) $(LIBS)
 	cp $(SO_PATH) $(INSTALL_PATH)/$(SO_NAME)
 	ldconfig
 
