@@ -6,19 +6,24 @@ APP = parcel
 INSTALL_PATH := /usr/local/lib
 mkfile_path  := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir  := $(notdir $(patsubst %/,%,$(dir $(mkfile_path))))
-SO_PATH      := $(abspath $(dir mkfile_path))/lparcel.so
+SO_NAME      := lparcel.so
+SO_PATH      := $(abspath $(dir mkfile_path))/$(SO_NAME)
 DIR          := $(shell pwd)
 
 # Compiler flags
-INCLUDES   = -I../lib/udt4/src/ -I../include/
-OPTFLAGS   = -finline-functions -O3
-LIBS       = -ludt
-ERRFLAGS   = -Wall -Werror
-FSFLAGS    = -D_LARGE_FILE_SOURCE=1
-MISCFLAGS  = -g -fPIC
-CCFLAGS    = -D$(os) $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS)
-LDFLAGS    = -lstdc++ -lpthread -lm -L../lib/udt/src
-LINK_FLAGS = -shared -Wl,-soname,lparcel.so
+INCLUDES        = -I../lib/udt4/src/ -I../include/
+OPTFLAGS        = -finline-functions -O3
+LIBS            = -ludt
+ERRFLAGS        = -Wall -Werror
+FSFLAGS         = -D_LARGE_FILE_SOURCE=1
+MISCFLAGS       = -g -fPIC
+CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
+LDFLAGS         = -lstdc++ -lpthread -lm -L../lib/udt/src
+LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
+LD_LINK_FLAGS   = $(INSTALL_PATH)/libudt.so
+
+# Objects
+OBJECTS = parcel.o transcribers.o udt2tcp.o tcp2udt.o
 
 ifndef os
    os = LINUX
@@ -29,7 +34,7 @@ ifndef arch
 endif
 
 ifeq ($(arch), IA32)
-    CCFLAGS += -DIA32 #-mcpu=pentiumpro -march=pentiumpro -mmmx -msse
+    CCFLAGS += -DIA32
 endif
 
 ifeq ($(arch), POWERPC)
@@ -57,15 +62,16 @@ all: $(APP)
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -c -static
 
-parcel: parcel.o
-	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INSTALL_PATH)/libudt.so parcel.o $(LIBS)
+parcel: $(OBJECTS)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(LD_LINK_FLAGS) $(OBJECTS) $(LIBS)
 
 clean:
-	rm -f *.o lparcel.so
+	rm -f *.o $(SO_NAME)
 
 install:
 	export PATH=$(DIR):$$PATH
-	cp lparcel.so $(INSTALL_PATH)/lparcel.so
+	ldconfig
+	cp $(SO_PATH) $(INSTALL_PATH)/$(SO_NAME)
 
 uninstall:
-	rm $(INSTALL_PATH)/lparcel.so $(INSTALL_PATH)/libudt.so
+	rm $(INSTALL_PATH)/$(SO_NAME)

@@ -1,6 +1,7 @@
 from log import get_logger
 from client import Client
 import urlparse
+from cparcel import lib
 
 # Logging
 log = get_logger('client')
