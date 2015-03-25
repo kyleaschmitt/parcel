@@ -8,9 +8,11 @@ Parcel is written on top of the UDT protocol and bound to a python interface.  P
 
 #### Using UDT
 
-The client can be run in conjunction with a parcel server, or without one.  The advantage of running the client with the server is the UDT proxy layer.  The server is given a local REST endpoint with access to data.  The client UDT connection to the server is translated to a local TCP connection and the data is proxied back using UDT.  
+The client can be run in conjunction with a parcel server, or without one.  The advantage of running the client with the server (option `udt`) is the UDT proxy layer.  This prevents performance degredation of Wide Area Networks.
 
-#### Usin TCP
+The server is given a REST endpoint with access to data.  The client connects to the server via UDT and the data is translated to a local TCP connection. Any TCP response is then proxied back using UDT.  
+
+#### Using TCP
 
 Using the `http` option is alternative to running the client against a server with the `udt` option.  It can be run directly against a REST api without any additional server. Using this method, you are likely to see decreased performance over high latency networks.
 
@@ -38,6 +40,8 @@ UDT (UDP Based Data transfer) is a reliable application level protocol for trans
 
 To install both the server and the client, simply run (preferrably in a python virtual environment):
 ```
+❯ make
+❯ sudo make install
 ❯ python setup.py install
 ```
 

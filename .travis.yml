@@ -9,7 +9,8 @@ cache:
 before_install:
   - echo -e 'Host github.com\n\tStrictHostKeyChecking no\n' >> ~/.ssh/config
   - sudo apt-get install python-dev
-  - sudo ./install
 install:
+  - make
+  - sudo make install
   - python setup.py install
 script: "nosetests -v"
