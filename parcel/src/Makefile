@@ -120,7 +120,7 @@ all: $(APP)
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -o $@ -c
 
-parcel: $(OBJECTS)
+parcel: $(OBJECTS) $(UDT_OBJECTS)
 	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(UDT_OBJECTS) $(OBJECTS) $(LIBS)
 
 ################################################################################
