@@ -33,7 +33,8 @@
  ******************************************************************************/
 
 #include "parcel.h"
-#include "simclist.h"
+
+int TCP_SERVER_SOCKET = 0;
 
 
 EXTERN int tcp2udt_start(char *local_host, char *local_port,
