@@ -42,7 +42,7 @@ MISCFLAGS       = -g -fPIC -static
 CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
 LDFLAGS         = -lstdc++ -lpthread -lm -ludt $(patsubst %,-L%,$(INC_DIRS))
 LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
-LIBS            = -ludt
+LIBS            = -ludt -L$(UDT_DIR)
 
 ################################################################################
 # Library objects
