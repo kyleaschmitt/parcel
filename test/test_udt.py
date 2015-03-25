@@ -40,7 +40,7 @@ class TestParcelUDT(unittest.TestCase):
             with open(dst, 'r') as d:
                 self.assertEqual(s.read(), d.read())
 
-    @unittest.expectedFailure
+    @unittest.skip("UDT tests unfinished")
     def test_serial(self):
         for file_id in self.file_ids:
             print file_id
@@ -55,7 +55,7 @@ class TestParcelUDT(unittest.TestCase):
                 os.path.join(gettempdir(), self.dest_dir, '{}_{}'.format(
                     file_id, file_id)))
 
-    @unittest.expectedFailure
+    @unittest.skip("UDT tests unfinished")
     def test_parallel(self):
         for file_id in self.file_ids:
             print file_id

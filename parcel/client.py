@@ -140,7 +140,10 @@ class Client(object):
         url = urlparse.urljoin(self.uri, file_id)
         log.debug('Request to {}'.format(url))
         r = requests.get(url, headers=headers, verify=verify, stream=True)
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except Exception as e:
+            raise RuntimeError('{}: {}'.format(str(e), r.text))
         if close:
             r.close()
         return r
@@ -311,7 +314,11 @@ class Client(object):
 
         # Download each file
         for file_id in set(file_ids):
-            self.parallel_download(file_id, *args, **kwargs)
+            try:
+                self.parallel_download(file_id, *args, **kwargs)
+            except Exception as e:
+                log.error('Unable to download {}: {}'.format(
+                    file_id, str(e)))
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.

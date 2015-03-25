@@ -75,10 +75,10 @@ if __name__ == '__main__':
 
     udt = subparsers.add_parser('udt', help='Download files via UDT',
                                 parents=[general_parser])
-    udt.add_argument('--proxy-host', default='localhost', type=str,
+    udt.add_argument('-i', '--proxy-host', default='localhost', type=str,
                      dest='proxy_host',
                      help='The port to bind the local proxy to')
-    udt.add_argument('--proxy-port', default='9000', type=str,
+    udt.add_argument('-p', '--proxy-port', default='9000', type=str,
                      dest='proxy_port',
                      help='The port to bind the local proxy to')
 

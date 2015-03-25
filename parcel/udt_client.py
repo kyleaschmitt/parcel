@@ -1,6 +1,10 @@
 from log import get_logger
 from client import Client
 import urlparse
+from cparcel import lib
+# from multiprocessing import Process
+from threading import Thread
+import time
 
 # Logging
 log = get_logger('client')
@@ -21,7 +25,7 @@ class UDTClient(Client):
         """
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'
-        local_uri = '{}://{}:{}'.format(p.scheme, proxy_host, proxy_port)
+        local_uri = '{}://{}:{}/data'.format(p.scheme, proxy_host, proxy_port)
         return local_uri
 
     def start_proxy_server(self, proxy_host, proxy_port, remote_uri):
@@ -31,7 +35,9 @@ class UDTClient(Client):
 
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'
-        port = p.port or {'https': '443', 'http': '80'}[p.scheme]
+        port = p.port or 9000
         log.info('Binding proxy server {}:{} -> {}:{}'.format(
-            proxy_host, proxy_port, p.hostname, port))
-        raise NotImplementedError('TODO: proxy bindings')
+            str(proxy_host), str(proxy_port), str(p.hostname), str(port)))
+        proxy = lib.tcp2udt_start(
+            str(proxy_host), str(proxy_port), str(p.hostname), str(port))
+        assert proxy == 0, 'Proxy failed to start'
