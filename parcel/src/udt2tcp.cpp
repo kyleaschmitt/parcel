@@ -18,12 +18,19 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
      *  connection to remote_host:remote_port.
      */
 
+    log("Proxy binding to local UDT socket [%s:%s] to remote TCP [%s:%s]",
+        local_host, local_port, remote_host, remote_port);
+
     addrinfo hints;
     addrinfo* res;
     int mss = MSS;
     int udt_buffer_size = BUFF_SIZE;
     int udp_buffer_size = BUFF_SIZE;
     UDTSOCKET udt_socket;
+
+    /*******************************************************************
+     * Establish server socket
+     ******************************************************************/
 
     /* Setup address information */
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -44,11 +51,11 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     UDT::setsockopt(udt_socket, 0, UDP_SNDBUF, &udp_buffer_size, sizeof(int));
 
     /* Bind the server socket */
-    log("Proxy binding to UDT socket");
     if (UDT::bind(udt_socket, res->ai_addr, res->ai_addrlen) == UDT::ERROR){
         cerr << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
+    debug("Proxy bound to UDT socket [%s:%s]", local_host, local_port);
 
     /* We no longer need this address information */
     freeaddrinfo(res);
@@ -59,6 +66,10 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
         cerr << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
+
+    /*******************************************************************
+     * Accept clients
+     ******************************************************************/
 
     while (1){
         /* Wait for the next connection */
@@ -75,20 +86,33 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
         }
         debug("New UDT connection");
 
-        /* Create thread args */
-        udt2tcp_args_t *args = (udt2tcp_args_t *) malloc(sizeof(udt2tcp_args_t));
-        args->udt_socket  = client_socket;
-        args->remote_host = remote_host;
-        args->remote_port = remote_port;
+        /* Create transcriber thread args */
+        transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
+        transcriber_args->tcp_socket  = 0;  // will be set by thread_udt2tcp
+        transcriber_args->udt_socket  = client_socket;
+        transcriber_args->remote_host = remote_host;
+        transcriber_args->remote_port = remote_port;
 
-        /* Create thread */
-        pthread_t client_thread;
-        if (pthread_create(&client_thread, NULL, thread_udt2tcp, args)){
-            cerr << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
-            free(args);
+        /* Create tcp2udt thread */
+        pthread_t tcp_thread;
+        if (pthread_create(&tcp_thread, NULL, thread_tcp2udt, transcriber_args)){
+            perror("Unable to TCP thread");
+            free(transcriber_args);
+            return 0;
         } else {
-            pthread_detach(client_thread);
+            pthread_detach(tcp_thread);
         }
+
+        /* Create udt2tcp thread */
+        pthread_t udt_thread;
+        if (pthread_create(&udt_thread, NULL, thread_udt2tcp, transcriber_args)){
+            perror("Unable to TCP thread");
+            free(transcriber_args);
+            return 0;
+        } else {
+            pthread_detach(udt_thread);
+        }
+
     }
 
     return 0;
@@ -146,17 +170,32 @@ void *thread_udt2tcp(void *_args_)
      * Setup proxy procedure
      ******************************************************************/
 
+    /*
+     * I've made the design choice that the udt2tcp thread is not
+     * responsible for the udt socket, because it is reading from it,
+     * not writing.  Therefore, we will wait for an external entity to
+     * set args->udt_socket to be a valid descriptor (it may already
+     * be valid as set by a _start() method).
+     */
     debug("Waiting on UDT socket ready");
     while (!args->udt_socket){
         pthread_yield();
     }
     debug("UDT socket ready: %d", args->udt_socket);
 
-    /* Connect to remote tcp */
-    int tcp_socket;
-    if ((tcp_socket = connect_remote_tcp(args)) < 0){
-        free(args);
-        return NULL;
+    /*
+     * Similarly I've made the design choice that the udt2tcp thread
+     * IS responsible for the tcp socket, because it is writing to it,
+     * not reading.  Therefore, we will attempt to connect to a remote
+     * server via tcp. However, if there is already an existing tcp
+     * connection, then by golly, someone wants us to use it (that
+     * someone is me or you?).
+     */
+    if (!args->tcp_socket){
+        if ((args->tcp_socket = connect_remote_tcp(args)) < 0){
+            free(args);
+            return NULL;
+        }
     }
 
     /* Create udt2tcp pipe, read from 0, write to 1 */
@@ -186,7 +225,7 @@ void *thread_udt2tcp(void *_args_)
     /* Create pipe to TCP thread */
     pthread_t pipe2tcp_thread;
     tcp_pipe_args_t *pipe2tcp_args = (tcp_pipe_args_t*)malloc(sizeof(tcp_pipe_args_t));
-    pipe2tcp_args->tcp_socket = tcp_socket;
+    pipe2tcp_args->tcp_socket = args->tcp_socket;
     pipe2tcp_args->pipe = pipefd[0];
     debug("Creating pipe2tcp thread");
     if (pthread_create(&pipe2tcp_thread, NULL, pipe2tcp, pipe2tcp_args)){

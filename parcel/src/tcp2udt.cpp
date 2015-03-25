@@ -17,6 +17,8 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
      *  Incomming connections get their own thread and a proxied
      *  connection to remote_host:remote_port.
      */
+    log("Proxy binding to local TCP socket [%s:%s] to remote UDT [%s:%s]",
+        local_host, local_port, remote_host, remote_port);
 
     addrinfo hints;
     addrinfo* res;
@@ -46,7 +48,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
     }
 
     /* Bind the server socket */
-    log("Proxy binding to TCP socket.");
+    log("Proxy binding to TCP socket [%s:%s]", local_host, local_port);
     if (bind(tcp_socket, res->ai_addr, res->ai_addrlen)){
         perror("Unable to bind TCP socket");
         return -1;
@@ -87,7 +89,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
 
         /* Create transcriber thread args */
         transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
-        transcriber_args->udt_socket  = 0;
+        transcriber_args->udt_socket  = 0;  // will be set by thread_tcp2udt
         transcriber_args->tcp_socket  = client_socket;
         transcriber_args->remote_host = remote_host;
         transcriber_args->remote_port = remote_port;
@@ -173,27 +175,47 @@ int connect_remote_udt(transcriber_args_t *args)
 void *thread_tcp2udt(void *_args_)
 {
     /*
-     *  thread_udt2tcp() -
+     *  thread_tcp2udt() -
      *
      */
     transcriber_args_t *args = (transcriber_args_t*) _args_;
 
-    /* Connect to remote tcp */
-    if ((args->udt_socket = connect_remote_udt(args)) <= 0){
-        close(args->udt_socket);
-        free(args);
-        return NULL;
-    }
-
     /*******************************************************************
-     * Begin proxy procedure
+     * Setup proxy procedure
      ******************************************************************/
 
+    /*
+     * I've made the design choice that the tcp2udt thread is not
+     * responsible for the tcp socket, because it is reading from it,
+     * not writing.  Therefore, we will wait for an external entity to
+     * set args->tcp_socket to be a valid descriptor (it may already
+     * be valid as set by a _start() method).
+     */
     debug("Waiting on TCP socket ready");
     while (!args->tcp_socket){
         pthread_yield();
     }
     debug("TCP socket ready: %d", args->tcp_socket);
+
+    /*
+     * Similarly I've made the design choice that the tcp2udt thread
+     * IS responsible for the udt socket, because it is writing to it,
+     * not reading.  Therefore, we will attempt to connect to a remote
+     * server via udt. However, if there is already an existing udt
+     * connection, then by golly, someone wants us to use it (that
+     * someone is me or you?).
+     */
+    if (!args->udt_socket){
+        if ((args->udt_socket = connect_remote_udt(args)) <= 0){
+            close(args->udt_socket);
+            free(args);
+            return NULL;
+        }
+    }
+
+    /*******************************************************************
+     * Begin proxy procedure
+     ******************************************************************/
 
     /* Create pipe, read from 0, write to 1 */
     int pipefd[2];
