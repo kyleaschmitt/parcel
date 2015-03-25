@@ -22,7 +22,7 @@
 #include <iostream>
 #include <assert.h>
 
-#include <udt4>
+#include <udt>
 
 /******************************************************************************/
 #define BUFF_SIZE 67108864
