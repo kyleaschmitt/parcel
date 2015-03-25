@@ -35,8 +35,9 @@ class UDTClient(Client):
 
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'
-        port = p.port or {'https': '443', 'http': '80'}[p.scheme]
+        port = p.port or 9000
         log.info('Binding proxy server {}:{} -> {}:{}'.format(
             str(proxy_host), str(proxy_port), str(p.hostname), str(port)))
-        lib.tcp2udt_start(
+        proxy = lib.tcp2udt_start(
             str(proxy_host), str(proxy_port), str(p.hostname), str(port))
+        assert proxy == 0, 'Proxy failed to start'

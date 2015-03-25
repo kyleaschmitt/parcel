@@ -38,9 +38,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     if (getaddrinfo(NULL, local_port, &hints, &res) != 0){
-        cerr << "illegal port number or port is busy: "
-             << "[" << local_port << "]"
-             << endl;
+        error("illegal port number or port is busy: [%s]", local_port);
         return -1;
     }
 
@@ -52,29 +50,30 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
 
     /* Bind the server socket */
     if (UDT::bind(udt_socket, res->ai_addr, res->ai_addrlen) == UDT::ERROR){
-        cerr << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
+        error("bind: %s", UDT::getlasterror().getErrorMessage());
         return -1;
     }
-    debug("Proxy bound to UDT socket [%s:%s]", local_host, local_port);
+    log("Proxy bound to local UDT socket [%s:%s] to remote TCP [%s:%s]",
+        local_host, local_port, remote_host, remote_port);
 
     /* We no longer need this address information */
     freeaddrinfo(res);
 
     /* Listen on the port for UDT connections */
-    debug("Calling UDT socket listen");
+    log("Calling UDT socket listen");
     if (UDT::listen(udt_socket, 10) == UDT::ERROR){
-        cerr << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
+        error(": listen: %s", UDT::getlasterror().getErrorMessage());
         return -1;
     }
 
-    debug("Creating pipe2tcp server thread");
+    log("Creating pipe2tcp server thread");
     pthread_t udt2tcp_server_thread;
     server_args_t *args = (server_args_t*) malloc(sizeof(server_args_t));
     args->remote_host = strdup(remote_host);
     args->remote_port = strdup(remote_port);
     args->udt_socket  = udt_socket;
     if (pthread_create(&udt2tcp_server_thread, NULL, udt2tcp_accept_clients, args)){
-        perror("unable to create udt2tcp server thread");
+        error("unable to create udt2tcp server thread");
         free(args);
         return -1;
     }
@@ -103,7 +102,7 @@ EXTERN void *udt2tcp_accept_clients(void *_args_)
             cerr << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
             return 0;
         }
-        debug("New UDT connection");
+        log("New UDT connection");
 
         /* Create transcriber thread args */
         transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
@@ -115,7 +114,7 @@ EXTERN void *udt2tcp_accept_clients(void *_args_)
         /* Create tcp2udt thread */
         pthread_t tcp_thread;
         if (pthread_create(&tcp_thread, NULL, thread_tcp2udt, transcriber_args)){
-            perror("Unable to TCP thread");
+            error("Unable to TCP thread");
             free(transcriber_args);
             return 0;
         } else {
@@ -125,7 +124,7 @@ EXTERN void *udt2tcp_accept_clients(void *_args_)
         /* Create udt2tcp thread */
         pthread_t udt_thread;
         if (pthread_create(&udt_thread, NULL, thread_udt2tcp, transcriber_args)){
-            perror("Unable to TCP thread");
+            error("Unable to TCP thread");
             free(transcriber_args);
             return 0;
         } else {
@@ -155,7 +154,7 @@ int connect_remote_tcp(udt2tcp_args_t *args)
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     if (0 != getaddrinfo(NULL, args->remote_port, &hints, &local)){
-        perror("incorrect network address");
+        error("incorrect network address");
         return -1;
     }
 
@@ -163,15 +162,14 @@ int connect_remote_tcp(udt2tcp_args_t *args)
     tcp_socket = socket(local->ai_family, local->ai_socktype, local->ai_protocol);
     freeaddrinfo(local);
     if (0 != getaddrinfo(args->remote_host, args->remote_port, &hints, &peer)){
-        cerr << "incorrect server/peer address. "
-             << args->remote_host << ":" << args->remote_port
-             << endl;
+        error("incorrect server/peer address: [%s:%s]",
+              args->remote_host, args->remote_port);
         return -1;
     }
 
     /* Connect to the remote tcp server */
     if (connect(tcp_socket, peer->ai_addr, peer->ai_addrlen)){
-        perror("connect:");
+        perror("TCP connect");
         return -1;
     }
     freeaddrinfo(peer);
@@ -199,6 +197,8 @@ void *thread_udt2tcp(void *_args_)
      */
     debug("Waiting on UDT socket ready");
     while (!args->udt_socket){
+        // TODO: Add semaphore on socket ready, pthread_yield is a
+        // lazy solution for now
         pthread_yield();
     }
     debug("UDT socket ready: %d", args->udt_socket);
@@ -237,7 +237,7 @@ void *thread_udt2tcp(void *_args_)
     udt2pipe_args->pipe = pipefd[1];
     debug("Creating udt2pipe thread");
     if (pthread_create(&udt2pipe_thread, NULL, udt2pipe, udt2pipe_args)){
-        perror("unable to create udt2pipe thread");
+        error("unable to create udt2pipe thread");
         free(args);
         return NULL;
     }
@@ -249,7 +249,7 @@ void *thread_udt2tcp(void *_args_)
     pipe2tcp_args->pipe = pipefd[0];
     debug("Creating pipe2tcp thread");
     if (pthread_create(&pipe2tcp_thread, NULL, pipe2tcp, pipe2tcp_args)){
-        perror("unable to create pipe2udt thread");
+        error("unable to create pipe2udt thread");
         free(args);
         return NULL;
     }

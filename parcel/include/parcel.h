@@ -28,7 +28,7 @@
 #define MSS 8400
 #define EXTERN extern "C"
 #define LOG
-#define DEBUG
+/* #define DEBUG */
 
 /******************************************************************************/
 using namespace std;
@@ -103,7 +103,7 @@ void *pipe2tcp(void *_args_);
         fprintf(stderr, "\n");                             \
     } while(0)
 #else
-#define info(msg)
+#define log(fmt, ...)
 #endif
 
 #ifdef DEBUG
@@ -114,8 +114,15 @@ void *pipe2tcp(void *_args_);
         fprintf(stderr, "\n");                              \
     } while(0)
 #else
-#define debug(msg)
+#define debug(fmt, ...)
 #endif
+
+#define error(fmt, ...)                                     \
+    do {                                                    \
+        fprintf(stderr, "[parcel][%s][ERROR] ", __func__);  \
+        fprintf(stderr, fmt, ##__VA_ARGS__);                \
+        fprintf(stderr, "\n");                              \
+    } while(0)
 
 
 #endif  //__PARCEL_H__

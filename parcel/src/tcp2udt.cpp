@@ -53,6 +53,8 @@ int tcp2udt_start(char *local_host, char *local_port,
         perror("Unable to bind TCP socket");
         return -1;
     }
+    log("Proxy bound to local TCP socket [%s:%s] to remote UDT [%s:%s]",
+        local_host, local_port, remote_host, remote_port);
 
     /* We no longer need this address information */
     freeaddrinfo(res);

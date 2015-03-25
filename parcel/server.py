@@ -25,9 +25,9 @@ class Server(object):
         port = p.port or {'https': '443', 'http': '80'}[p.scheme]
         log.info('Binding proxy server {}:{} -> {}:{}'.format(
             proxy_host, proxy_port, p.hostname, port))
-        lib.udt2tcp_start(
+        proxy = lib.udt2tcp_start(
             str(proxy_host), str(proxy_port), str(p.hostname), str(port))
+        assert proxy == 0, 'Proxy failed to start'
 
         while True:
-            # Block because udt2tcp_start is non-blocking
-            time.sleep(99999999)
+            time.sleep(99999999)  # Block because udt2tcp_start is non-blocking
