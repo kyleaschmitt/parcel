@@ -2,6 +2,7 @@ import atexit
 import signal
 import urlparse
 from cparcel import lib
+import time
 
 from log import get_logger
 
@@ -26,3 +27,7 @@ class Server(object):
             proxy_host, proxy_port, p.hostname, port))
         lib.udt2tcp_start(
             str(proxy_host), str(proxy_port), str(p.hostname), str(port))
+
+        while True:
+            # Block because udt2tcp_start is non-blocking
+            time.sleep(99999999)

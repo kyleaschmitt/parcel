@@ -7,8 +7,8 @@
 #include "parcel.h"
 
 
-EXTERN int tcp2udt_start(char *local_host, char *local_port,
-                         char *remote_host, char *remote_port)
+int tcp2udt_start(char *local_host, char *local_port,
+                  char *remote_host, char *remote_port)
 {
     /*
      *  tcp2udt_start() - starts a TCP-to-UDT proxy thread
@@ -64,10 +64,28 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
         return -1;
     }
 
-    /*******************************************************************
-     * Accept clients
-     ******************************************************************/
+    debug("Creating pipe2tcp server thread");
+    pthread_t tcp2udt_server_thread;
+    server_args_t *args = (server_args_t*) malloc(sizeof(server_args_t));
+    args->remote_host = strdup(remote_host);
+    args->remote_port = strdup(remote_port);
+    args->tcp_socket  = tcp_socket;
+    if (pthread_create(&tcp2udt_server_thread, NULL, tcp2udt_accept_clients, args)){
+        perror("unable to create tcp2udt server thread");
+        free(args);
+        return -1;
+    }
 
+    return 0;
+}
+
+EXTERN void *tcp2udt_accept_clients(void *_args_)
+{
+    /*
+     *  udt2tcp_accept_clients() - Accepts incoming UDT clients
+     *
+     */
+    server_args_t *args = (server_args_t*) _args_;
     while (1) {
 
         int client_socket;
@@ -76,7 +94,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
 
         /* Wait for the next connection */
         debug("Accepting incoming TCP connections");
-        client_socket = accept(tcp_socket, (sockaddr*)&clientaddr, &addrlen);
+        client_socket = accept(args->tcp_socket, (sockaddr*)&clientaddr, &addrlen);
         if (client_socket < 0){
             perror("Socket accept failed");
             return 0;
@@ -91,8 +109,8 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
         transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
         transcriber_args->udt_socket  = 0;  // will be set by thread_tcp2udt
         transcriber_args->tcp_socket  = client_socket;
-        transcriber_args->remote_host = remote_host;
-        transcriber_args->remote_port = remote_port;
+        transcriber_args->remote_host = args->remote_host;
+        transcriber_args->remote_port = args->remote_port;
 
         /* Create tcp2udt thread */
         pthread_t tcp_thread;
@@ -115,8 +133,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
         }
 
     }
-
-    return 0;
+    return NULL;
 }
 
 int connect_remote_udt(transcriber_args_t *args)
@@ -125,6 +142,8 @@ int connect_remote_udt(transcriber_args_t *args)
      *  connect_remote_udt() - Creates client connection to UDT server
      *
      */
+    debug("Connecting to remote UDT at [%s:%s]",
+          args->remote_host, args->remote_port);
 
     UDTSOCKET udt_socket;
     int mss = MSS;

@@ -36,6 +36,13 @@ using namespace std;
 /******************************************************************************
  * thread arg structures
  ******************************************************************************/
+typedef struct server_args_t {
+    UDTSOCKET udt_socket;
+    int tcp_socket;
+    char *remote_host;
+    char *remote_port;
+} server_args_t;
+
 typedef struct transcriber_args_t {
     UDTSOCKET udt_socket;
     int tcp_socket;
@@ -59,6 +66,7 @@ typedef struct tcp_pipe_args_t {
 EXTERN int udt2tcp_start(char *local_host, char *local_port, char *remote_host, char *remote_port);
 int connect_remote_tcp(transcriber_args_t *args);
 void *thread_udt2tcp(void *_args_);
+EXTERN void *udt2tcp_accept_clients(void *_args_);
 
 /******************************************************************************
  * file: tcp2udt.cpp
@@ -66,6 +74,7 @@ void *thread_udt2tcp(void *_args_);
 EXTERN int tcp2udt_start(char *local_host, char *local_port, char *remote_host, char *remote_port);
 int connect_remote_udt(transcriber_args_t *args);
 void *thread_tcp2udt(void *_args_);
+EXTERN void *tcp2udt_accept_clients(void *_args_);
 
 /******************************************************************************
  * file: parcel.cpp

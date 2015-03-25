@@ -41,7 +41,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
         cerr << "illegal port number or port is busy: "
              << "[" << local_port << "]"
              << endl;
-        return 0;
+        return -1;
     }
 
     /* Create the server socket */
@@ -53,7 +53,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     /* Bind the server socket */
     if (UDT::bind(udt_socket, res->ai_addr, res->ai_addrlen) == UDT::ERROR){
         cerr << "bind: " << UDT::getlasterror().getErrorMessage() << endl;
-        return 0;
+        return -1;
     }
     debug("Proxy bound to UDT socket [%s:%s]", local_host, local_port);
 
@@ -64,12 +64,31 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     debug("Calling UDT socket listen");
     if (UDT::listen(udt_socket, 10) == UDT::ERROR){
         cerr << "listen: " << UDT::getlasterror().getErrorMessage() << endl;
-        return 0;
+        return -1;
     }
 
-    /*******************************************************************
-     * Accept clients
-     ******************************************************************/
+    debug("Creating pipe2tcp server thread");
+    pthread_t udt2tcp_server_thread;
+    server_args_t *args = (server_args_t*) malloc(sizeof(server_args_t));
+    args->remote_host = strdup(remote_host);
+    args->remote_port = strdup(remote_port);
+    args->udt_socket  = udt_socket;
+    if (pthread_create(&udt2tcp_server_thread, NULL, udt2tcp_accept_clients, args)){
+        perror("unable to create udt2tcp server thread");
+        free(args);
+        return -1;
+    }
+
+    return 0;
+}
+
+EXTERN void *udt2tcp_accept_clients(void *_args_)
+{
+    /*
+     *  udt2tcp_accept_clients() - Accepts incoming UDT clients
+     *
+     */
+    server_args_t *args = (server_args_t*) _args_;
 
     while (1){
         /* Wait for the next connection */
@@ -79,7 +98,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
 
         /* Wait for the next connection */
         debug("Accepting incoming UDT connections");
-        if ((client_socket = UDT::accept(udt_socket, (sockaddr*)&clientaddr, &addrlen))
+        if ((client_socket = UDT::accept(args->udt_socket, (sockaddr*)&clientaddr, &addrlen))
             == UDT::INVALID_SOCK){
             cerr << "accept: " << UDT::getlasterror().getErrorMessage() << endl;
             return 0;
@@ -90,8 +109,8 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
         transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
         transcriber_args->tcp_socket  = 0;  // will be set by thread_udt2tcp
         transcriber_args->udt_socket  = client_socket;
-        transcriber_args->remote_host = remote_host;
-        transcriber_args->remote_port = remote_port;
+        transcriber_args->remote_host = args->remote_host;
+        transcriber_args->remote_port = args->remote_port;
 
         /* Create tcp2udt thread */
         pthread_t tcp_thread;
@@ -115,7 +134,6 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
 
     }
 
-    return 0;
 }
 
 int connect_remote_tcp(udt2tcp_args_t *args)
@@ -125,6 +143,8 @@ int connect_remote_tcp(udt2tcp_args_t *args)
      *
      *  Connects a TCP socket to a remote tcp server.
      */
+    debug("Connecting to remote UDT at [%s:%s]",
+          args->remote_host, args->remote_port);
 
     struct addrinfo hints, *local, *peer;
     int tcp_socket;
