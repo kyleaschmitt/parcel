@@ -34,8 +34,6 @@
 
 #include "parcel.h"
 
-int TCP_SERVER_SOCKET = 0;
-
 
 EXTERN int tcp2udt_start(char *local_host, char *local_port,
                          char *remote_host, char *remote_port)
