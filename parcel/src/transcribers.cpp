@@ -101,6 +101,39 @@ void *tcp2pipe(void *_args_)
     return NULL;
 }
 
+
+int read_size_from_fd(int fd, char *buffer, int size, struct timeval timeout){
+    fd_set set;
+    int total_read = 0;
+    int read_size = 0;
+
+    /* Initialize the file descriptor set. */
+    FD_ZERO(&set);
+    FD_SET(fd, &set);
+
+
+    while (total_read < size){
+        int select_res = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
+        if (select_res < 0){
+            /* Error reading from pipe */
+            error("Unable to read from pipe");
+            return total_read;
+        } else if (select_res == 0) {
+            /* We timed out, there is no more data for now */
+            debug("No data to read, returning with %d bytes");
+            return total_read;
+        } else {
+            /* Read from pipe */
+            if ((read_size = read(fd, buffer, BUFF_SIZE)) <= 0){
+                debug("Unable to read from pipe.");
+                return -1;
+            }
+            total_read += read_size;
+        }
+    }
+    return total_read;
+}
+
 void *pipe2udt(void *_args_)
 {
     /*
@@ -113,9 +146,17 @@ void *pipe2udt(void *_args_)
     int temp_size;
     int this_size;
 
+    int block_size = 128*1024;
+
+    /* Initialize the timeout data structure. */
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100;
+
     while (1){
-        /* Read from pipe */
-        if ((read_size = read(args->pipe, buffer, BUFF_SIZE)) <= 0){
+
+        read_size = read_size_from_fd(args->pipe, buffer, block_size, timeout);
+        if (read_size < 0){
             debug("Unable to read from pipe.");
             goto cleanup;
         }
@@ -125,7 +166,7 @@ void *pipe2udt(void *_args_)
         int sent_size = 0;
         debug("Writing %d bytes to UDT socket %d", read_size, args->udt_socket);
         while (sent_size < read_size) {
-            this_size = read_size - sent_size;
+            this_size = min(read_size - sent_size, block_size);
             temp_size = UDT::send(args->udt_socket, buffer + sent_size, this_size, 0);
             if (UDT::ERROR == temp_size){
                 error("send: %s", UDT::getlasterror().getErrorMessage());
@@ -140,6 +181,7 @@ void *pipe2udt(void *_args_)
     debug("Exiting pipe2udt thread.");
     UDT::close(args->udt_socket);
     close(args->pipe);
+    free(buffer);
     return NULL;
 }
 

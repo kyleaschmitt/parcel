@@ -50,8 +50,10 @@
 #include <udt>
 
 /******************************************************************************/
-#define BUFF_SIZE 67108864
-#define MSS 8400
+/* #define BUFF_SIZE 67108864 */
+/* #define MSS 8400 */
+#define BUFF_SIZE 10000000
+#define MSS 9000
 #define EXTERN extern "C"
 #define LOG
 
