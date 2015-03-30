@@ -102,32 +102,40 @@ void *tcp2pipe(void *_args_)
 }
 
 
-int read_size_from_fd(int fd, char *buffer, int size, struct timeval timeout){
+int read_size_from_fd(int fd, char *buffer, int size, int sec, int usec){
     fd_set set;
     int total_read = 0;
     int read_size = 0;
+
+    struct timeval timeout;
+    timeout.tv_sec = sec;
+    timeout.tv_usec = usec;
 
     /* Initialize the file descriptor set. */
     FD_ZERO(&set);
     FD_SET(fd, &set);
 
+    debug("looking for %d", size);
 
     while (total_read < size){
         int select_res = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
         if (select_res < 0){
             /* Error reading from pipe */
-            error("Unable to read from pipe");
+            perror("Unable to read from pipe");
             return total_read;
         } else if (select_res == 0) {
             /* We timed out, there is no more data for now */
-            debug("No data to read, returning with %d bytes");
+            debug("No data to read, returning with %d bytes (%f)",
+                  total_read, total_read*100./size);
             return total_read;
         } else {
             /* Read from pipe */
-            if ((read_size = read(fd, buffer, BUFF_SIZE)) <= 0){
+            int this_size = max(min(size-total_read, size), 0);
+            if ((read_size = read(fd, buffer+total_read, this_size)) <= 0){
                 debug("Unable to read from pipe.");
                 return -1;
             }
+            debug("Read intermediate %d from pipe", read_size);
             total_read += read_size;
         }
     }
@@ -141,21 +149,18 @@ void *pipe2udt(void *_args_)
      *
      */
     udt_pipe_args_t *args = (udt_pipe_args_t*) _args_;
-    char *buffer = (char*) malloc(BUFF_SIZE);
     int read_size;
     int temp_size;
     int this_size;
 
-    int block_size = 128*1024;
+    int block_size = 128*1024*1024;
+    char *buffer = (char*) malloc(block_size);
+    int timeout = 1000;  // microseconds
 
     /* Initialize the timeout data structure. */
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 100;
-
     while (1){
 
-        read_size = read_size_from_fd(args->pipe, buffer, block_size, timeout);
+        read_size = read_size_from_fd(args->pipe, buffer, block_size, 0, timeout);
         if (read_size < 0){
             debug("Unable to read from pipe.");
             goto cleanup;
@@ -179,9 +184,9 @@ void *pipe2udt(void *_args_)
 
  cleanup:
     debug("Exiting pipe2udt thread.");
+    free(buffer);
     UDT::close(args->udt_socket);
     close(args->pipe);
-    free(buffer);
     return NULL;
 }
 
@@ -222,6 +227,7 @@ void *pipe2tcp(void *_args_)
 
  cleanup:
     debug("Exiting pipe2tcp thread.");
+    free(buffer);
     close(args->tcp_socket);
     close(args->pipe);
     return NULL;
