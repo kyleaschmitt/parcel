@@ -19,11 +19,11 @@ Using the `http` option is alternative to running the client against a server wi
 ## Example Usage
 
 ```
-❯ parcel http -t token_file api.server.host file1 file2
+❯ parcel http -t token_file https://api.server.host/data file_id1 file_id2
 ```
 OR
 ```
-❯ parcel udt -t token_file parcel.server.host file1 file2
+❯ parcel udt -t token_file https://parcel.server.host/data file_id1 file_id2
 ```
 
 ## Motivation
