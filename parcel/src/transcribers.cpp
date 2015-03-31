@@ -153,9 +153,9 @@ void *pipe2udt(void *_args_)
     int temp_size;
     int this_size;
 
-    int block_size = 128*1024*1024;
+    int block_size = 128*1024;
     char *buffer = (char*) malloc(block_size);
-    int timeout = 1000;  // microseconds
+    int timeout = 10000;  // microseconds
 
     /* Initialize the timeout data structure. */
     while (1){
