@@ -2,9 +2,6 @@ from log import get_logger
 from client import Client
 import urlparse
 from cparcel import lib
-# from multiprocessing import Process
-from threading import Thread
-import time
 
 # Logging
 log = get_logger('client')

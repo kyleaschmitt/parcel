@@ -1,25 +1,28 @@
-from math import ceil
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
+from multiprocessing import Process
+from intervaltree import Interval
 from threading import Thread
 import os
-import requests
 import time
+
+import requests
 import urlparse
 
+from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
 from utils import print_download_information, set_file_length, get_pbar,\
-    write_offset, calculate_segments
+    write_offset
 
 # Logging
 log = get_logger('client')
 
 
-def download_worker(args):
-    client, file_id, path, segment, q_out = args
-    return client.try_retry_read_write_segment(
-        3, file_id, path, segment, q_out)
+def download_worker(client, path, file_id, producer):
+    while True:
+        interval = producer.q_work.get()
+        if interval is None:
+            return log.debug('Producer returned with no more work')
+        client.read_write_segment(path, file_id, interval, producer.q_complete)
 
 
 class Client(object):
@@ -48,23 +51,83 @@ class Client(object):
         self.start, self.stop = None, None
 
     ############################################################
-    #                          Util
+    #                          REST
     ############################################################
 
-    def split_file(self, size, blocks):
-        """Given a file and number of blocks, divide the interval into a
-        chunked workload.  The block sizes will be evenly distributed
-        best as possible; the last block will contain the normal
-        interval size or smaller.
+    def construct_header(self, start=None, end=None):
+        """Return a standard header for any parcel HTTP request.  If ``start``
+        and ``end`` are specified, then the header will contain a Range
+        request.
 
-        :param int size: The total size of the file
-        :param int blocks: The number of blocks to divide the file into.
+        :param int start: optional. The beginning of the range interval
+        :param int end: optional.
+            The end of the range interval. This value is inclusive.
+            If give range A-B, then both bytes A and B will be
+            included.
+        :returns: A dictionary header containing the token
 
         """
 
-        block_size = int(ceil(float(size)/blocks))
-        segments = calculate_segments(0, size, block_size)
-        return segments, block_size
+        header = {
+            'X-Auth-Token': self.token,
+        }
+        if start is not None and end is not None:
+            header['Range'] = 'bytes={}-{}'.format(start, end)
+            # provide host because it's mandatory, range request
+            # may not work otherwise
+            scheme, host, path, params, q, frag = urlparse.urlparse(self.uri)
+            header['host'] = host
+        return header
+
+    def make_file_request(self, file_id, headers, verify=False,
+                          close=False, max_retries=16):
+        """Make request for file and return the response.
+
+        :param str file_id: The id of the entity being requested.
+        :param dict headers: Request headers. see :func:`construct_header()`.
+        :param bool verify: Verify SSL hostname
+        :param bool close:
+            Automatically close the connection. Set to true if you just
+            the response header.
+        :returns: A `requests` response.
+
+        """
+        url = urlparse.urljoin(self.uri, file_id)
+        log.debug('Request to {}'.format(url))
+
+        # Set urllib3 retries and mount for session
+        a = requests.adapters.HTTPAdapter(max_retries=max_retries)
+        s = requests.Session()
+        s.mount(urlparse.urlparse(url).scheme, a)
+
+        r = s.get(url, headers=headers, verify=verify, stream=True)
+        try:
+            r.raise_for_status()
+        except Exception as e:
+            raise RuntimeError('{}: {}'.format(str(e), r.text))
+        if close:
+            r.close()
+        return r
+
+    def request_file_information(self, file_id):
+        """Make a request to the data server for information on the file.
+
+        :param str file_id: The id of the entity being requested.
+        :returns: Tuple containing the name and size of the entity
+
+        """
+
+        headers = self.construct_header()
+        r = self.make_file_request(file_id, headers, close=True)
+        size = long(r.headers['Content-Length'])
+        log.info('Request responded: {} bytes'.format(size))
+        attachment = r.headers.get('content-disposition', None)
+        name = attachment.split('filename=')[-1] if attachment else 'untitled'
+        return name, size
+
+    ############################################################
+    #                          Util
+    ############################################################
 
     def check_transfer_size(self, actual, expected):
         """Simple validation on any expected versus actual sizes.
@@ -96,74 +159,6 @@ class Client(object):
         thread.start()
         return thread
 
-    ############################################################
-    #                          REST
-    ############################################################
-
-    def construct_header(self, start=None, end=None):
-        """Return a standard header for any parcel HTTP request.  If ``start``
-        and ``end`` are specified, then the header will contain a Range
-        request.
-
-        :param int start: optional. The beginning of the range interval
-        :param int end: optional.
-            The end of the range interval. This value is inclusive.
-            If give range A-B, then both bytes A and B will be
-            included.
-        :returns: A dictionary header containing the token
-
-        """
-
-        header = {
-            'X-Auth-Token': self.token,
-        }
-        if start is not None and end is not None:
-            header['Range'] = 'bytes={}-{}'.format(start, end)
-            # provide host because it's mandatory, range request
-            # may not work otherwise
-            scheme, host, path, params, q, frag = urlparse.urlparse(self.uri)
-            header['host'] = host
-        return header
-
-    def make_file_request(self, file_id, headers, verify=False, close=False):
-        """Make request for file and return the response.
-
-        :param str file_id: The id of the entity being requested.
-        :param dict headers: Request headers. see :func:`construct_header()`.
-        :param bool verify: Verify SSL hostname
-        :param bool close:
-            Automatically close the connection. Set to true if you just
-            the response header.
-        :returns: A `requests` response.
-
-        """
-        url = urlparse.urljoin(self.uri, file_id)
-        log.debug('Request to {}'.format(url))
-        r = requests.get(url, headers=headers, verify=verify, stream=True)
-        try:
-            r.raise_for_status()
-        except Exception as e:
-            raise RuntimeError('{}: {}'.format(str(e), r.text))
-        if close:
-            r.close()
-        return r
-
-    def request_file_information(self, file_id):
-        """Make a request to the data server for information on the file.
-
-        :param str file_id: The id of the entity being requested.
-        :returns: Tuple containing the name and size of the entity
-
-        """
-
-        headers = self.construct_header()
-        r = self.make_file_request(file_id, headers, close=True)
-        size = long(r.headers['Content-Length'])
-        log.info('Request responded: {} bytes'.format(size))
-        attachment = r.headers.get('content-disposition', None)
-        name = attachment.split('filename=')[-1] if attachment else None
-        return name, size
-
     def get_file_path(self, file_id, file_name):
         """Function to standardize the output path for a download.
 
@@ -176,7 +171,7 @@ class Client(object):
         return os.path.join(self.directory, '{}_{}'.format(
             file_id, file_name))
 
-    def read_write_segment(self, file_id, path, segment, q_out):
+    def read_write_segment(self, path, file_id, interval, q_complete):
         """Read data from the data server and write it to a file.
 
         :param str file_id: The id of the file
@@ -189,44 +184,21 @@ class Client(object):
         """
 
         written = 0
-        write_thread = None
-        start, end = segment
+        start, end = interval.begin, interval.end-1
+        headers = self.construct_header(start, end)
+        r = self.make_file_request(file_id, headers)
         log.debug('Initializing segment: {}-{}'.format(start, end))
-        header = self.construct_header(start, end)
-        r = self.make_file_request(file_id, header)
         for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
             if not chunk:
                 continue  # Empty are keep-alives.
-            # Write async to file
-            write_thread = self.async_write(
-                write_thread, path, chunk, start + written)
+            offset = start + written
             written += len(chunk)
-            q_out.put(len(chunk))  # for async reporting
+            # Write async to file
+            write_offset(path, chunk, offset)
+            # Report completion
+            q_complete.put(Interval(offset, offset+len(chunk)))
         self.check_transfer_size(end - start + 1, written)
         return written
-
-    def try_retry_read_write_segment(self, retries, *args, **kwargs):
-        """A wrapper for :func:`read_write_segment()`.  Will on retry of the
-        correct number of bytes was not downloaded.
-
-        :params str path: A string specifying the full download path
-        :params tuple segment:
-            A tuple containing the interval to download (start, end)
-        :params q_out: A multiprocessing Queue used for async reporting
-        :params int retries: The number of times to retry on failure
-        :returns: The total number of bytes written
-
-        """
-
-        try:
-            return self.read_write_segment(*args, **kwargs)
-        except ValueError as e:
-            log.warn('Buffering error: {}'.format(str(e)))
-            if retries <= 0:
-                raise ValueError(
-                    'Max buffer retries exceeded: {}'.format(str(e)))
-            return self.try_retry_read_write_segment(
-                retries-1, *args, **kwargs)
 
     ############################################################
     #                       Reporting
@@ -243,20 +215,8 @@ class Client(object):
 
         """
 
-        self.start_timer()
         print_download_information(file_id, size, name, path)
         set_file_length(path, size)
-        self.pbar = get_pbar(file_id, size)
-
-    def update_file_download(self, received):
-        """Currently only updates the file download progressbar.
-
-        :param int received: The amount to update the progressbar by.
-        :returns: None
-
-        """
-
-        self.pbar.update(self.pbar.currval + received)
 
     def finalize_file_download(self, size, total_received):
         """Finalize the download. Validate the download and clean up reporting.
@@ -268,8 +228,6 @@ class Client(object):
         """
 
         self.check_transfer_size(size, total_received)
-        self.stop_timer(size)
-        self.pbar.finish()
 
     def start_timer(self):
         """Start a download timer.
@@ -319,6 +277,7 @@ class Client(object):
             except Exception as e:
                 log.error('Unable to download {}: {}'.format(
                     file_id, str(e)))
+                raise
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.
@@ -328,28 +287,26 @@ class Client(object):
 
         """
 
-        # Process management
-        manager = Manager()
-        q = manager.Queue()
-
         # File informaion
         name, size = self.request_file_information(file_id)
         path = self.get_file_path(file_id, name)
 
-        # Create segments to stream
-        segments, block_size = self.split_file(size, self.n_procs)
+        # Where to load and save download state
+        save_path = '{path}.state'.format(path=path)
+        load_path = save_path
+
         self.initialize_file_download(file_id, name, path, size)
-        args = ((self, file_id, path, segment, q) for segment in segments)
+
+        # Create segments to stream
+        producer = SegmentProducer(
+            file_id, save_path, load_path, self.n_procs, size)
+        args = (self, path, file_id, producer)
 
         # Divide work amongst process pool
-        pool = Pool(self.n_procs)
-        async_result = pool.map_async(download_worker, args)
-
-        # Monitor progress
-        while self.pbar.currval < size:
-            self.update_file_download(q.get())
-
-        # Finalize download
-        total_received = sum(async_result.get())
-        self.finalize_file_download(size, total_received)
-        return total_received
+        pool = [Process(target=download_worker, args=args)
+                for i in range(self.n_procs)]
+        for p in pool:
+            p.start()
+        self.start_timer()
+        producer.wait_for_completion()
+        self.stop_timer()
