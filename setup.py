@@ -7,6 +7,7 @@ setup(
         'requests==2.6.0',
         'progressbar==2.3',
         'Flask==0.10.1',
+        'intervaltree==2.0.4',
     ],
     scripts=[
         'bin/parcel',
