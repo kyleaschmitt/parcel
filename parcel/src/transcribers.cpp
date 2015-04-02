@@ -48,7 +48,7 @@ void *udt2pipe(void *_args_)
         read_size = UDT::recv(args->udt_socket, buffer, BUFF_SIZE, 0);
         if (UDT::ERROR == read_size) {
             if (UDT::getlasterror().getErrorCode() != 2001){
-                error("recv: %s", UDT::getlasterror().getErrorMessage());
+                debug("recv: %s", UDT::getlasterror().getErrorMessage());
             }
             goto cleanup;
         }
@@ -128,7 +128,7 @@ void *pipe2udt(void *_args_)
             this_size = read_size - sent_size;
             temp_size = UDT::send(args->udt_socket, buffer + sent_size, this_size, 0);
             if (UDT::ERROR == temp_size){
-                error("send: %s", UDT::getlasterror().getErrorMessage());
+                debug("send: %s", UDT::getlasterror().getErrorMessage());
                 goto cleanup;
             }
             sent_size += temp_size;
@@ -170,7 +170,7 @@ void *pipe2tcp(void *_args_)
             this_size = read_size - sent_size;
             temp_size = send(args->tcp_socket, buffer + sent_size, this_size, 0);
             if (temp_size < 0){
-                error("unable to write to socket:");
+                debug("unable to write to socket:");
                 goto cleanup;
             }
             sent_size += temp_size;

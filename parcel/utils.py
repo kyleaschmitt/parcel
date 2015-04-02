@@ -14,7 +14,7 @@ except Exception as e:
     log.info('Unable to silence requests warnings: {}'.format(str(e)))
 
 
-def get_pbar(file_id, maxval):
+def get_pbar(file_id, maxval, start_val=0):
     """Create and initialize a custom progressbar
 
     :param str title: The text of the progress bar
@@ -26,7 +26,8 @@ def get_pbar(file_id, maxval):
         title, Percentage(), ' ',
         Bar(marker='#', left='[', right=']'), ' ',
         ETA(), ' ', FileTransferSpeed(), ' '], maxval=maxval)
-    pbar.update(0)
+    pbar.currval = start_val
+    pbar.start()
     return pbar
 
 
