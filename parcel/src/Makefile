@@ -28,28 +28,20 @@ APP = parcel
   INST_UDT_OBJ    = $(patsubst %,$(INSTALL_PATH)/%,$(UDT_LIB))
 
 ################################################################################
-# Clist
-################################################################################
-# C linked list directory
-  CLIST_DIR       = simclist
-# C linked list objects
-  CLIST_OBJS      = simclist.o
-# Construct the full path to installed simclist library
-  CLIST_OBJECTS   = $(patsubst %,$(CLIST_DIR)/%,$(CLIST_OBJS))
-
-################################################################################
 # Dependencies
 ################################################################################
 # Construct all depencency paths
-  DEP_DIRS        = $(CLIST_PATH)
+  DEP_DIRS        = $(UDT_DIR)
 # Construct all depencency objects
-  DEP_OBJS        = $(CLIST_OBJECTS)
+  DEP_OBJS        = $(UDT_OBJECTS)
+# Construct all depencency objects with installation paths
+  INST_DEP_OBJS   = $(INST_CLIST_OBJ)
 
 ################################################################################
 # Compiler flags
 ################################################################################
 # Construct include flags from INC_DIRS and dependencies
-  INCLUDES        = $(patsubst %,-I%,$(INC_DIRS)) $(patsubst %,-I%,$(DEPENDENCIES))
+  INCLUDES        = $(patsubst %,-I%,$(INC_DIRS)) $(patsubst %,-I%,$(DEP_DIRS))
 # Optimization flags
   OPTFLAGS        = -finline-functions -O3
 # Error flags
@@ -70,7 +62,7 @@ APP = parcel
 ################################################################################
 # Library objects
 ################################################################################
-OBJECTS         = $(DEP_OBJS) transcribers.o udt2tcp.o tcp2udt.o
+  OBJECTS         = transcribers.o udt2tcp.o tcp2udt.o
 
 ################################################################################
 # OS options
@@ -120,28 +112,32 @@ all: $(APP)
 %.o: %.cpp
 	$(C++) $(CCFLAGS) $(LDFLAGS) $< -o $@ -c
 
-parcel: $(OBJECTS) $(UDT_OBJECTS)
-	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(UDT_OBJECTS) $(OBJECTS) $(LIBS)
+parcel: $(OBJECTS) $(DEP_OBJS)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(DEP_OBJS) $(OBJECTS) $(LIBS)
 
 ################################################################################
 # Build dependencies
 ################################################################################
 
-udt4/src/libudt.so:
+$(UDT_OBJECTS):
 	make -C udt4/src
+
+$(CLIST_OBJECTS):
+	cd simclist && cmake . && make
 
 ################################################################################
 # Manage library
 ################################################################################
 
 clean:
-	rm -f $(OBJECTS) $(CLIST_OBJ) $(SO_NAME)
+	rm -f $(OBJECTS) $(DEP_OBJS) $(SO_NAME)
 
 install:
+	mkdir -p $(INSTALL_PATH)
 	cp $(UDT_OBJECTS) $(INST_UDT_OBJ)
-	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INST_UDT_OBJ) $(OBJECTS) $(LIBS)
+	$(C++) $(LINK_FLAGS) -o $(SO_PATH) $(INST_DEP_OBJS) $(OBJECTS) $(LIBS)
 	cp $(SO_PATH) $(INSTALL_PATH)/$(SO_NAME)
 	ldconfig
 
 uninstall:
-	rm $(INSTALL_PATH)/$(SO_NAME)
+	rm $(INSTALL_PATH)/$(SO_NAME) $(INST_UDT_OBJ)

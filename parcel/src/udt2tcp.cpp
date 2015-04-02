@@ -33,7 +33,6 @@
  ******************************************************************************/
 
 #include "parcel.h"
-#include "simclist.h"
 
 
 EXTERN int udt2tcp_start(char *local_host, char *local_port,
