@@ -33,20 +33,17 @@
 #ifndef __PARCEL_H__
 #define __PARCEL_H__
 
-#ifndef WIN32
+/* Standard libraries */
 #include <unistd.h>
 #include <cstdlib>
 #include <cstring>
 #include <netdb.h>
 #include <sys/socket.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <wspiapi.h>
-#endif
 #include <iostream>
 #include <assert.h>
+#include <signal.h>
 
+/* Non standard libraries */
 #include <udt>
 
 /******************************************************************************/
