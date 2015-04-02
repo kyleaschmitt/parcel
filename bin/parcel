@@ -12,8 +12,14 @@ log = get_logger('parcel_client')
 def get_client(args, token):
     if args.mode == 'udt':
         return UDTClient(
-            args.proxy_host, args.proxy_port,
-            args.server.pop(0), token, args.n_processes, args.dir)
+            proxy_host=args.proxy_host,
+            proxy_port=args.proxy_port,
+            remote_uri=args.server.pop(0),
+            token=token,
+            n_procs=args.n_processes,
+            directory=args.dir,
+            external_proxy=args.external_proxy,
+        )
     elif args.mode == 'http':
         return HTTPClient(
             args.server.pop(0), token, args.n_processes, args.dir)
@@ -81,6 +87,9 @@ if __name__ == '__main__':
     udt.add_argument('-p', '--proxy-port', default='9000', type=str,
                      dest='proxy_port',
                      help='The port to bind the local proxy to')
+    udt.add_argument('-e', '--external-proxy', action='store_true',
+                     dest='external_proxy',
+                     help='Do not create a local proxy but bind to an external one')
 
     #############################################################
     #                      HTTP options

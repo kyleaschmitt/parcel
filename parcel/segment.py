@@ -6,7 +6,6 @@ import pickle
 
 from log import get_logger
 from utils import get_pbar
-from const import HTTP_CHUNK_SIZE
 
 # Logging
 log = get_logger('client')
