@@ -5,7 +5,8 @@ import tempfile
 import pickle
 
 from log import get_logger
-from utils import get_pbar
+from utils import get_pbar, read_offset, md5sum, mmap_open, set_file_length
+from progressbar import ProgressBar, Percentage, Bar, ETA
 
 # Logging
 log = get_logger('client')
@@ -13,14 +14,17 @@ log = get_logger('client')
 
 class SegmentProducer(object):
 
-    def __init__(self, file_id, save_path, load_path, n_procs, size,
-                 save_interval=int(1e6)):
+    def __init__(self, file_id, file_path, save_path, load_path, n_procs, size,
+                 save_interval=int(1e6), check_segment_md5sums=False):
 
+        self.file_id = file_id
+        self.file_path = file_path
         self.save_path = save_path
         self.n_procs = n_procs
         self.size = size
         self.pbar = None
         self.save_interval = save_interval
+        self.check_segment_md5sums = check_segment_md5sums
 
         # Setup producer
         self.manager = Manager()
@@ -29,7 +33,7 @@ class SegmentProducer(object):
 
         # Setup work pool
         self.load_state(load_path, size)
-        if self.size_complete == self.size:
+        if self.is_complete():
             log.info('File already complete.')
             return
 
@@ -40,11 +44,35 @@ class SegmentProducer(object):
         # Reporting
         self.pbar = get_pbar(file_id, size)
 
-        # Schedule work
+        # Create file if needed and schedule work
+        set_file_length(self.file_path, self.size)
         self.schedule()
 
     def integrate(self, itree):
         return sum([i.end-i.begin for i in itree.items()])
+
+    def validate_segment_md5sums(self):
+        if not self.check_segment_md5sums:
+            return True
+        intervals = sorted(self.completed.items())
+        pbar = ProgressBar(widgets=[
+            'Checksumming {}:'.format(self.file_id), Percentage(), ' ',
+            Bar(marker='#', left='[', right=']'), ' ', ETA()])
+        with mmap_open(self.file_path) as data:
+            for interval in pbar(intervals):
+                log.debug('Checking segment md5: {}'.format(interval))
+                if not interval.data or 'md5sum' not in interval.data:
+                    log.error(
+                        'User opted to check segment md5sums on restart. '
+                        'Previous download did not record segment '
+                        'md5sums (--no-segment-md5sums).')
+                    return
+                chunk = data[interval.begin:interval.end]
+                checksum = md5sum(chunk)
+                if checksum != interval.data.get('md5sum'):
+                    log.warn('Corrupt segment {}, {}. Redownloading.'.format(
+                        interval, checksum))
+                    self.completed.remove(interval)
 
     def load_state(self, load_path, size):
         # Establish default intervals
@@ -59,6 +87,11 @@ class SegmentProducer(object):
         # downloaded sections from work_pool
         log.info('Found state file {}, attempting to resume download'.format(
             load_path))
+
+        if not os.path.isfile(self.file_path):
+            log.error('State file found but no file for {}.'.format(
+                self.file_id) + 'Restarting entire download.')
+            return
         try:
             with open(load_path, "rb") as f:
                 self.completed = pickle.load(f)
@@ -68,6 +101,7 @@ class SegmentProducer(object):
             self.completed = IntervalTree()
             log.error('Unable to resume file state: {}'.format(str(e)))
         else:
+            self.validate_segment_md5sums()
             self.size_complete = self.integrate(self.completed)
             for interval in self.completed:
                 self.work_pool.chop(interval.begin, interval.end)
@@ -123,8 +157,13 @@ class SegmentProducer(object):
         except Exception as e:
             log.error('Unable to update pbar: {}'.format(str(e)))
 
+    def check_file_exists_and_size(self):
+        return (os.path.isfile(self.file_path)
+                and os.path.getsize(self.file_path) == self.size)
+
     def is_complete(self):
-        return self.integrate(self.completed) == self.size
+        return (self.integrate(self.completed) == self.size and
+                self.check_file_exists_and_size())
 
     def finish_download(self):
         for i in range(self.n_procs):

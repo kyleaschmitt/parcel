@@ -1,6 +1,5 @@
 from multiprocessing import Process
 from intervaltree import Interval
-from threading import Thread
 import os
 import time
 
@@ -10,7 +9,8 @@ import urlparse
 from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from utils import print_download_information, set_file_length, write_offset
+from utils import print_download_information, set_file_length, write_offset, \
+    md5sum
 
 # Logging
 log = get_logger('client')
@@ -26,7 +26,7 @@ def download_worker(client, path, file_id, producer):
 
 class Client(object):
 
-    def __init__(self, uri, token, n_procs, directory):
+    def __init__(self, uri, token, n_procs, directory, segment_md5sums=False):
         """Creates a parcel client object.
 
         :param str uri:
@@ -45,6 +45,7 @@ class Client(object):
         self.n_procs = n_procs
         self.uri = uri if uri.endswith('/') else uri + '/'
         self.directory = directory
+        self.segment_md5sums = segment_md5sums
 
         # Nullify timers
         self.start, self.stop = None, None
@@ -141,23 +142,6 @@ class Client(object):
                 'Transfer size incorrect: {} != {} expected'.format(
                     actual, expected))
 
-    def async_write(self, thread, path, chunk, offset):
-        """Async write to a file with offset from the beginning. If ``thread``
-        then join the last async write before continuing.
-
-        :param Thread thread: The result of a previous async_write to block on
-        :param str path: The path to the file to write to
-        :param str chunk: The string-like object to write to file
-        :param int offset: The offset from the beginning of the file
-        :returns: A python Thread object that was spawned to write to the file
-
-        """
-        if thread:
-            thread.join()
-        thread = Thread(target=write_offset, args=(path, chunk, offset))
-        thread.start()
-        return thread
-
     def get_file_path(self, file_id, file_name):
         """Function to standardize the output path for a download.
 
@@ -183,20 +167,35 @@ class Client(object):
         """
 
         written = 0
+        # Create header that specifies range and make initial stream
+        # request. Note the 1 subtracted from the end of the interval
+        # is because the HTTP range request is inclusive of the top of
+        # the interval.
         start, end = interval.begin, interval.end-1
+        assert end >= start, 'Invalid segment range.'
         headers = self.construct_header(start, end)
         r = self.make_file_request(file_id, headers)
+
+        # Iterate over the data stream
         log.debug('Initializing segment: {}-{}'.format(start, end))
         for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
             if not chunk:
                 continue  # Empty are keep-alives.
             offset = start + written
             written += len(chunk)
-            # Write async to file
+
+            # Write the chunk to disk, create an interval that
+            # represents the chunk, get md5 info if necessary, and
+            # report completion back to the producer
             write_offset(path, chunk, offset)
-            # Report completion
-            q_complete.put(Interval(offset, offset+len(chunk)))
-        self.check_transfer_size(end - start + 1, written)
+            if self.segment_md5sums:
+                iv_data = {'md5sum': md5sum(chunk)}
+            else:
+                iv_data = None
+            segment = Interval(offset, offset+len(chunk), iv_data)
+            q_complete.put(segment)
+
+        self.check_transfer_size(written, interval.end - interval.begin)
         return written
 
     ############################################################
@@ -215,7 +214,6 @@ class Client(object):
         """
 
         print_download_information(file_id, size, name, path)
-        set_file_length(path, size)
 
     def finalize_file_download(self, size, total_received):
         """Finalize the download. Validate the download and clean up reporting.
@@ -276,7 +274,6 @@ class Client(object):
             except Exception as e:
                 log.error('Unable to download {}: {}'.format(
                     file_id, str(e)))
-                raise
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.
@@ -298,7 +295,14 @@ class Client(object):
 
         # Create segments to stream
         producer = SegmentProducer(
-            file_id, save_path, load_path, self.n_procs, size)
+            file_id=file_id,
+            file_path=path,
+            save_path=save_path,
+            load_path=load_path,
+            n_procs=self.n_procs,
+            size=size,
+            check_segment_md5sums=self.segment_md5sums,
+        )
         args = (self, path, file_id, producer)
 
         # Divide work amongst process pool
