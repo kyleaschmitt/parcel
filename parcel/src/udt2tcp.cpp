@@ -51,6 +51,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     addrinfo hints;
     addrinfo* res;
     int mss = MSS;
+    int reuseaddr = 1;
     int udt_buffer_size = BUFF_SIZE;
     int udp_buffer_size = BUFF_SIZE;
     UDTSOCKET udt_socket;
@@ -74,6 +75,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     UDT::setsockopt(udt_socket, 0, UDT_MSS, &mss, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDT_SNDBUF, &udt_buffer_size, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDP_SNDBUF, &udp_buffer_size, sizeof(int));
+    UDT::setsockopt(udt_socket, 0, UDT_REUSEADDR, &reuseaddr, sizeof(int));
 
     /* Bind the server socket */
     if (UDT::bind(udt_socket, res->ai_addr, res->ai_addrlen) == UDT::ERROR){

@@ -51,6 +51,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
     addrinfo hints;
     addrinfo* res;
     int tcp_socket;
+    int reuseaddr = 1;
 
     /*******************************************************************
      * Establish server socket
@@ -74,6 +75,7 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
         perror("Unable to create TCP socket");
         return -1;
     }
+    setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(int));
 
     /* Bind the server socket */
     log("Proxy binding to TCP socket [%s:%s]", local_host, local_port);
