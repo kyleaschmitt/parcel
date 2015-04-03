@@ -2,9 +2,6 @@ from log import get_logger
 from client import Client
 import urlparse
 from cparcel import lib
-# from multiprocessing import Process
-from threading import Thread
-import time
 
 # Logging
 log = get_logger('client')
@@ -12,8 +9,11 @@ log = get_logger('client')
 
 class UDTClient(Client):
 
-    def __init__(self, proxy_host, proxy_port, remote_uri, *args, **kwargs):
-        self.start_proxy_server(proxy_host, proxy_port, remote_uri)
+    def __init__(self, proxy_host, proxy_port, remote_uri,
+                 external_proxy=False, *args, **kwargs):
+        if not external_proxy:
+            # Create a local UDT proxy that translates TCP to UDT
+            self.start_proxy_server(proxy_host, proxy_port, remote_uri)
         local_uri = self.construct_local_uri(
             proxy_host, proxy_port, remote_uri)
         super(UDTClient, self).__init__(local_uri, *args, **kwargs)

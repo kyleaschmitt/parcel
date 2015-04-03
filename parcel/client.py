@@ -1,30 +1,32 @@
-from math import ceil
-from multiprocessing import Manager
-from multiprocessing.pool import Pool
-from threading import Thread
+from multiprocessing import Process
+from intervaltree import Interval
 import os
-import requests
 import time
+
+import requests
 import urlparse
 
+from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from utils import print_download_information, set_file_length, get_pbar,\
-    write_offset, calculate_segments
+from utils import print_download_information, set_file_length, write_offset, \
+    md5sum
 
 # Logging
 log = get_logger('client')
 
 
-def download_worker(args):
-    client, file_id, path, segment, q_out = args
-    return client.try_retry_read_write_segment(
-        3, file_id, path, segment, q_out)
+def download_worker(client, path, file_id, producer):
+    while True:
+        interval = producer.q_work.get()
+        if interval is None:
+            return log.debug('Producer returned with no more work')
+        client.read_write_segment(path, file_id, interval, producer.q_complete)
 
 
 class Client(object):
 
-    def __init__(self, uri, token, n_procs, directory):
+    def __init__(self, uri, token, n_procs, directory, segment_md5sums=False):
         """Creates a parcel client object.
 
         :param str uri:
@@ -43,58 +45,10 @@ class Client(object):
         self.n_procs = n_procs
         self.uri = uri if uri.endswith('/') else uri + '/'
         self.directory = directory
+        self.segment_md5sums = segment_md5sums
 
         # Nullify timers
         self.start, self.stop = None, None
-
-    ############################################################
-    #                          Util
-    ############################################################
-
-    def split_file(self, size, blocks):
-        """Given a file and number of blocks, divide the interval into a
-        chunked workload.  The block sizes will be evenly distributed
-        best as possible; the last block will contain the normal
-        interval size or smaller.
-
-        :param int size: The total size of the file
-        :param int blocks: The number of blocks to divide the file into.
-
-        """
-
-        block_size = int(ceil(float(size)/blocks))
-        segments = calculate_segments(0, size, block_size)
-        return segments, block_size
-
-    def check_transfer_size(self, actual, expected):
-        """Simple validation on any expected versus actual sizes.
-
-        :param int actual: The size that was actually transferred
-        :param int actual: The size that was expected to be transferred
-
-        """
-
-        if actual != expected:
-            raise ValueError(
-                'Transfer size incorrect: {} != {} expected'.format(
-                    actual, expected))
-
-    def async_write(self, thread, path, chunk, offset):
-        """Async write to a file with offset from the beginning. If ``thread``
-        then join the last async write before continuing.
-
-        :param Thread thread: The result of a previous async_write to block on
-        :param str path: The path to the file to write to
-        :param str chunk: The string-like object to write to file
-        :param int offset: The offset from the beginning of the file
-        :returns: A python Thread object that was spawned to write to the file
-
-        """
-        if thread:
-            thread.join()
-        thread = Thread(target=write_offset, args=(path, chunk, offset))
-        thread.start()
-        return thread
 
     ############################################################
     #                          REST
@@ -125,7 +79,8 @@ class Client(object):
             header['host'] = host
         return header
 
-    def make_file_request(self, file_id, headers, verify=False, close=False):
+    def make_file_request(self, file_id, headers, verify=False,
+                          close=False, max_retries=16):
         """Make request for file and return the response.
 
         :param str file_id: The id of the entity being requested.
@@ -139,7 +94,13 @@ class Client(object):
         """
         url = urlparse.urljoin(self.uri, file_id)
         log.debug('Request to {}'.format(url))
-        r = requests.get(url, headers=headers, verify=verify, stream=True)
+
+        # Set urllib3 retries and mount for session
+        a = requests.adapters.HTTPAdapter(max_retries=max_retries)
+        s = requests.Session()
+        s.mount(urlparse.urlparse(url).scheme, a)
+
+        r = s.get(url, headers=headers, verify=verify, stream=True)
         try:
             r.raise_for_status()
         except Exception as e:
@@ -161,8 +122,25 @@ class Client(object):
         size = long(r.headers['Content-Length'])
         log.info('Request responded: {} bytes'.format(size))
         attachment = r.headers.get('content-disposition', None)
-        name = attachment.split('filename=')[-1] if attachment else None
+        name = attachment.split('filename=')[-1] if attachment else 'untitled'
         return name, size
+
+    ############################################################
+    #                          Util
+    ############################################################
+
+    def check_transfer_size(self, actual, expected):
+        """Simple validation on any expected versus actual sizes.
+
+        :param int actual: The size that was actually transferred
+        :param int actual: The size that was expected to be transferred
+
+        """
+
+        if actual != expected:
+            raise ValueError(
+                'Transfer size incorrect: {} != {} expected'.format(
+                    actual, expected))
 
     def get_file_path(self, file_id, file_name):
         """Function to standardize the output path for a download.
@@ -176,7 +154,7 @@ class Client(object):
         return os.path.join(self.directory, '{}_{}'.format(
             file_id, file_name))
 
-    def read_write_segment(self, file_id, path, segment, q_out):
+    def read_write_segment(self, path, file_id, interval, q_complete):
         """Read data from the data server and write it to a file.
 
         :param str file_id: The id of the file
@@ -189,44 +167,36 @@ class Client(object):
         """
 
         written = 0
-        write_thread = None
-        start, end = segment
+        # Create header that specifies range and make initial stream
+        # request. Note the 1 subtracted from the end of the interval
+        # is because the HTTP range request is inclusive of the top of
+        # the interval.
+        start, end = interval.begin, interval.end-1
+        assert end >= start, 'Invalid segment range.'
+        headers = self.construct_header(start, end)
+        r = self.make_file_request(file_id, headers)
+
+        # Iterate over the data stream
         log.debug('Initializing segment: {}-{}'.format(start, end))
-        header = self.construct_header(start, end)
-        r = self.make_file_request(file_id, header)
         for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
             if not chunk:
                 continue  # Empty are keep-alives.
-            # Write async to file
-            write_thread = self.async_write(
-                write_thread, path, chunk, start + written)
+            offset = start + written
             written += len(chunk)
-            q_out.put(len(chunk))  # for async reporting
-        self.check_transfer_size(end - start + 1, written)
+
+            # Write the chunk to disk, create an interval that
+            # represents the chunk, get md5 info if necessary, and
+            # report completion back to the producer
+            write_offset(path, chunk, offset)
+            if self.segment_md5sums:
+                iv_data = {'md5sum': md5sum(chunk)}
+            else:
+                iv_data = None
+            segment = Interval(offset, offset+len(chunk), iv_data)
+            q_complete.put(segment)
+
+        self.check_transfer_size(written, interval.end - interval.begin)
         return written
-
-    def try_retry_read_write_segment(self, retries, *args, **kwargs):
-        """A wrapper for :func:`read_write_segment()`.  Will on retry of the
-        correct number of bytes was not downloaded.
-
-        :params str path: A string specifying the full download path
-        :params tuple segment:
-            A tuple containing the interval to download (start, end)
-        :params q_out: A multiprocessing Queue used for async reporting
-        :params int retries: The number of times to retry on failure
-        :returns: The total number of bytes written
-
-        """
-
-        try:
-            return self.read_write_segment(*args, **kwargs)
-        except ValueError as e:
-            log.warn('Buffering error: {}'.format(str(e)))
-            if retries <= 0:
-                raise ValueError(
-                    'Max buffer retries exceeded: {}'.format(str(e)))
-            return self.try_retry_read_write_segment(
-                retries-1, *args, **kwargs)
 
     ############################################################
     #                       Reporting
@@ -243,20 +213,7 @@ class Client(object):
 
         """
 
-        self.start_timer()
         print_download_information(file_id, size, name, path)
-        set_file_length(path, size)
-        self.pbar = get_pbar(file_id, size)
-
-    def update_file_download(self, received):
-        """Currently only updates the file download progressbar.
-
-        :param int received: The amount to update the progressbar by.
-        :returns: None
-
-        """
-
-        self.pbar.update(self.pbar.currval + received)
 
     def finalize_file_download(self, size, total_received):
         """Finalize the download. Validate the download and clean up reporting.
@@ -268,8 +225,6 @@ class Client(object):
         """
 
         self.check_transfer_size(size, total_received)
-        self.stop_timer(size)
-        self.pbar.finish()
 
     def start_timer(self):
         """Start a download timer.
@@ -328,28 +283,33 @@ class Client(object):
 
         """
 
-        # Process management
-        manager = Manager()
-        q = manager.Queue()
-
         # File informaion
         name, size = self.request_file_information(file_id)
         path = self.get_file_path(file_id, name)
 
-        # Create segments to stream
-        segments, block_size = self.split_file(size, self.n_procs)
+        # Where to load and save download state
+        save_path = '{path}.state'.format(path=path)
+        load_path = save_path
+
         self.initialize_file_download(file_id, name, path, size)
-        args = ((self, file_id, path, segment, q) for segment in segments)
+
+        # Create segments to stream
+        producer = SegmentProducer(
+            file_id=file_id,
+            file_path=path,
+            save_path=save_path,
+            load_path=load_path,
+            n_procs=self.n_procs,
+            size=size,
+            check_segment_md5sums=self.segment_md5sums,
+        )
+        args = (self, path, file_id, producer)
 
         # Divide work amongst process pool
-        pool = Pool(self.n_procs)
-        async_result = pool.map_async(download_worker, args)
-
-        # Monitor progress
-        while self.pbar.currval < size:
-            self.update_file_download(q.get())
-
-        # Finalize download
-        total_received = sum(async_result.get())
-        self.finalize_file_download(size, total_received)
-        return total_received
+        pool = [Process(target=download_worker, args=args)
+                for i in range(self.n_procs)]
+        for p in pool:
+            p.start()
+        self.start_timer()
+        producer.wait_for_completion()
+        self.stop_timer()

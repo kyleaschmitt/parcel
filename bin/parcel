@@ -7,16 +7,30 @@ from parcel.log import get_logger
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
+HTTP = 'http'
+UDT = 'udt'
 
 
 def get_client(args, token):
-    if args.mode == 'udt':
+    kwargs = dict(
+        token=token,
+        n_procs=args.n_processes,
+        directory=args.dir,
+        segment_md5sums=args.segment_md5sums,
+    )
+    if args.mode == UDT:
         return UDTClient(
-            args.proxy_host, args.proxy_port,
-            args.server.pop(0), token, args.n_processes, args.dir)
-    elif args.mode == 'http':
+            proxy_host=args.proxy_host,
+            proxy_port=args.proxy_port,
+            remote_uri=args.server.pop(0),
+            external_proxy=args.external_proxy,
+            **kwargs
+        )
+    elif args.mode == HTTP:
         return HTTPClient(
-            args.server.pop(0), token, args.n_processes, args.dir)
+            uri=args.server.pop(0),
+            **kwargs
+        )
     raise RuntimeError('Unknown functionality.')
 
 
@@ -52,14 +66,15 @@ if __name__ == '__main__':
                                 default=os.path.abspath(os.getcwd()),
                                 help='Directory to download files to. '
                                 'Defaults to current dir')
-    general_parser.add_argument('-x', '--no-stats', action='store_true',
-                                help='turn off statistics printing')
     general_parser.add_argument('-n', '--n-processes', type=int, default=4,
                                 help='Number of udt client connections.')
     general_parser.add_argument('server', metavar='server', type=str, nargs=1,
                                 help='The parcel server udt address server[:port]')
     general_parser.add_argument('file_ids', metavar='file_id', type=str,
                                 nargs='*', help='uuids to download')
+    general_parser.add_argument('--no-segment-md5sums', dest='segment_md5sums',
+                                action='store_false',
+                                help='Calculate inbound segment md5sums and/or verify md5sums on restart')
 
     token_args = general_parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file',
@@ -73,7 +88,7 @@ if __name__ == '__main__':
     #                       UDT options
     #############################################################
 
-    udt = subparsers.add_parser('udt', help='Download files via UDT',
+    udt = subparsers.add_parser(UDT, help='Download files via UDT',
                                 parents=[general_parser])
     udt.add_argument('-i', '--proxy-host', default='localhost', type=str,
                      dest='proxy_host',
@@ -81,12 +96,15 @@ if __name__ == '__main__':
     udt.add_argument('-p', '--proxy-port', default='9000', type=str,
                      dest='proxy_port',
                      help='The port to bind the local proxy to')
+    udt.add_argument('-e', '--external-proxy', action='store_true',
+                     dest='external_proxy',
+                     help='Do not create a local proxy but bind to an external one')
 
     #############################################################
     #                      HTTP options
     #############################################################
 
-    http = subparsers.add_parser('http', help='Download files via HTTP',
+    http = subparsers.add_parser(HTTP, help='Download files via HTTP',
                                  parents=[general_parser])
 
     #############################################################

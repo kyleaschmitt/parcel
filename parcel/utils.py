@@ -1,8 +1,12 @@
 from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
 
+import os
 from const import GB
 from log import get_logger
 import requests
+import hashlib
+import mmap
+from contextlib import contextmanager
 
 # Logging
 log = get_logger('utils')
@@ -14,7 +18,7 @@ except Exception as e:
     log.info('Unable to silence requests warnings: {}'.format(str(e)))
 
 
-def get_pbar(file_id, maxval):
+def get_pbar(file_id, maxval, start_val=0):
     """Create and initialize a custom progressbar
 
     :param str title: The text of the progress bar
@@ -26,7 +30,8 @@ def get_pbar(file_id, maxval):
         title, Percentage(), ' ',
         Bar(marker='#', left='[', right=']'), ' ',
         ETA(), ' ', FileTransferSpeed(), ' '], maxval=maxval)
-    pbar.update(0)
+    pbar.currval = start_val
+    pbar.start()
     return pbar
 
 
@@ -47,10 +52,21 @@ def write_offset(path, data, offset):
     f.close()
 
 
+def read_offset(path, offset, size):
+    f = open(path, 'r+b')
+    f.seek(offset)
+    data = f.read(size)
+    f.close()
+    return data
+
+
 def set_file_length(path, length):
+    if os.path.isfile(path) and os.path.getsize(path) == length:
+        return
     f = open(path, 'wb')
     f.seek(length-1)
     f.write('\0')
+    f.truncate()
     f.close()
 
 
@@ -60,3 +76,16 @@ def calculate_segments(start, stop, block):
 
     """
     return [(a, min(stop, a+block)-1) for a in range(start, stop, block)]
+
+
+def md5sum(block):
+    m = hashlib.md5()
+    m.update(block)
+    return m.hexdigest()
+
+
+@contextmanager
+def mmap_open(path):
+    with open(path, "r+b") as f:
+        mm = mmap.mmap(f.fileno(), 0)
+        yield mm
