@@ -82,23 +82,26 @@ def set_file_length(path, length):
 
 
 def get_file_type(path):
-    mode = os.stat(path).st_mode
-    if S_ISDIR(mode):
-        return 'directory'
-    elif S_ISCHR(mode):
-        return 'character device'
-    elif S_ISBLK(mode):
-        return 'block device'
-    elif S_ISREG(mode):
-        return 'regular'
-    elif S_ISFIFO(mode):
-        return 'fifo'
-    elif S_ISLNK(mode):
-        return 'link'
-    elif S_ISSOCK(mode):
-        return 'socket'
-    else:
-        return 'unknown'
+    try:
+        mode = os.stat(path).st_mode
+        if S_ISDIR(mode):
+            return 'directory'
+        elif S_ISCHR(mode):
+            return 'character device'
+        elif S_ISBLK(mode):
+            return 'block device'
+        elif S_ISREG(mode):
+            return 'regular'
+        elif S_ISFIFO(mode):
+            return 'fifo'
+        elif S_ISLNK(mode):
+            return 'link'
+        elif S_ISSOCK(mode):
+            return 'socket'
+        else:
+            return 'unknown'
+    except Exception as e:
+        raise RuntimeError('Unable to get file type: {}'.format(str(e)))
 
 
 def calculate_segments(start, stop, block):
@@ -117,6 +120,9 @@ def md5sum(block):
 
 @contextmanager
 def mmap_open(path):
-    with open(path, "r+b") as f:
-        mm = mmap.mmap(f.fileno(), 0)
-        yield mm
+    try:
+        with open(path, "r+b") as f:
+            mm = mmap.mmap(f.fileno(), 0)
+            yield mm
+    except Exception as e:
+        raise RuntimeError('Unable to get file type: {}'.format(str(e)))
