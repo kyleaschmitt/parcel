@@ -50,9 +50,9 @@ class SegmentProducer(object):
         try:
             set_file_length(self.file_path, self.size)
         except:
-            log.error(STRIP(
-                """Unable to set file length! File appears to
-                be a {} file, attempting to proceed regardless.
+            log.warn(STRIP(
+                """Unable to set file length. File appears to
+                be a {} file, attempting to proceed.
                 """.format(get_file_type(self.file_path))))
             self.is_regular_file = False
         self.schedule()
@@ -98,7 +98,7 @@ class SegmentProducer(object):
             load_path))
 
         if not os.path.isfile(self.file_path):
-            log.error(STRIP(
+            log.warn(STRIP(
                 """State file found but no file for {}.
                 Restarting entire download.""".format(
                     self.file_id)))
