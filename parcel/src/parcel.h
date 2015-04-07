@@ -48,6 +48,7 @@
 
 /******************************************************************************/
 #define BUFF_SIZE 67108864
+#define CIRCULAR_BUFF_SIZE 4*BUFF_SIZE
 #define MSS 8400
 #define EXTERN extern "C"
 #define LOG
@@ -57,6 +58,34 @@
 
 /******************************************************************************/
 using namespace std;
+
+/******************************************************************************
+ * file: cbuffer.cpp
+ *
+ ******************************************************************************/
+class CircularBuffer
+{
+public:
+    CircularBuffer(size_t capacity);
+    ~CircularBuffer();
+
+    size_t size()     const { return size_;     }
+    size_t capacity() const { return capacity_; }
+    void   close()          { closed_ = true;   }
+    size_t read_nonblocking(char *data, size_t bytes);
+    size_t write_nonblocking(const char *data, size_t bytes);
+    /* Return number of bytes written. */
+    size_t write(const char *data, size_t bytes);
+    /* Return number of bytes read. */
+    size_t read(char *data, size_t bytes);
+
+private:
+    size_t beg_index_, end_index_, size_, capacity_;
+    pthread_cond_t cond_;
+    pthread_mutex_t cond_mutex_, pointer_mutex_;
+    bool closed_;
+    char *data_;
+};
 
 /******************************************************************************
  * thread arg structures
@@ -77,12 +106,12 @@ typedef struct transcriber_args_t {
 
 typedef struct udt_pipe_args_t {
     UDTSOCKET udt_socket;
-    int pipe;
+    CircularBuffer *pipe;
 } udt_pipe_args_t;
 
 typedef struct tcp_pipe_args_t {
     int tcp_socket;
-    int pipe;
+    CircularBuffer *pipe;
 } tcp_pipe_args_t;
 
 /******************************************************************************
