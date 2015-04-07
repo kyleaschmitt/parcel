@@ -17,6 +17,7 @@ def get_client(args, token):
         n_procs=args.n_processes,
         directory=args.dir,
         segment_md5sums=args.segment_md5sums,
+        debug=args.debug
     )
     if args.mode == UDT:
         return UDTClient(
@@ -75,6 +76,9 @@ if __name__ == '__main__':
     general_parser.add_argument('--no-segment-md5sums', dest='segment_md5sums',
                                 action='store_false',
                                 help='Calculate inbound segment md5sums and/or verify md5sums on restart')
+    general_parser.add_argument('--debug', dest='debug',
+                                action='store_true',
+                                help='Print stack traces')
 
     token_args = general_parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file',
