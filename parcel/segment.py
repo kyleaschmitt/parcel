@@ -5,7 +5,8 @@ import tempfile
 import pickle
 
 from log import get_logger
-from utils import get_pbar, md5sum, mmap_open, set_file_length, get_file_type
+from utils import get_pbar, md5sum, mmap_open, set_file_length,\
+    get_file_type, STRIP
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
 # Logging
@@ -25,6 +26,7 @@ class SegmentProducer(object):
         self.pbar = None
         self.save_interval = save_interval
         self.check_segment_md5sums = check_segment_md5sums
+        self.is_regular_file = False
 
         # Setup producer
         self.manager = Manager()
@@ -48,9 +50,11 @@ class SegmentProducer(object):
         try:
             set_file_length(self.file_path, self.size)
         except:
-            log.error('Unable to set file length! File appears to'
-                      'be a {} file, attempting to proceed regardless'.format(
-                          get_file_type(self.file_path)))
+            log.warn(STRIP(
+                """Unable to set file length. File appears to
+                be a {} file, attempting to proceed.
+                """.format(get_file_type(self.file_path))))
+            self.is_regular_file = False
         self.schedule()
 
     def integrate(self, itree):
@@ -67,10 +71,10 @@ class SegmentProducer(object):
             for interval in pbar(intervals):
                 log.debug('Checking segment md5: {}'.format(interval))
                 if not interval.data or 'md5sum' not in interval.data:
-                    log.error(
-                        'User opted to check segment md5sums on restart. '
-                        'Previous download did not record segment '
-                        'md5sums (--no-segment-md5sums).')
+                    log.error(STRIP(
+                        """User opted to check segment md5sums on restart.
+                        Previous download did not record segment
+                        md5sums (--no-segment-md5sums)."""))
                     return
                 chunk = data[interval.begin:interval.end]
                 checksum = md5sum(chunk)
@@ -94,8 +98,10 @@ class SegmentProducer(object):
             load_path))
 
         if not os.path.isfile(self.file_path):
-            log.error('State file found but no file for {}. '.format(
-                self.file_id) + 'Restarting entire download.')
+            log.warn(STRIP(
+                """State file found but no file for {}.
+                Restarting entire download.""".format(
+                    self.file_id)))
             return
         try:
             with open(load_path, "rb") as f:
@@ -163,8 +169,12 @@ class SegmentProducer(object):
             log.error('Unable to update pbar: {}'.format(str(e)))
 
     def check_file_exists_and_size(self):
-        return (os.path.isfile(self.file_path)
-                and os.path.getsize(self.file_path) == self.size)
+        if self.is_regular_file:
+            return (os.path.isfile(self.file_path)
+                    and os.path.getsize(self.file_path) == self.size)
+        else:
+            log.debug('File is not a regular file, refusing to check size.')
+            return (os.path.exists(self.file_path))
 
     def is_complete(self):
         return (self.integrate(self.completed) == self.size and
