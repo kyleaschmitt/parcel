@@ -9,8 +9,7 @@ import urlparse
 from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from utils import print_download_information, set_file_length, write_offset, \
-    md5sum
+from utils import print_download_information, write_offset, md5sum
 
 # Logging
 log = get_logger('client')

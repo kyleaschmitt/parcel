@@ -126,3 +126,7 @@ def mmap_open(path):
             yield mm
     except Exception as e:
         raise RuntimeError('Unable to get file type: {}'.format(str(e)))
+
+
+def STRIP(comment):
+    return ' '.join(comment.split())
