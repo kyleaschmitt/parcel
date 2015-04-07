@@ -5,7 +5,7 @@ import tempfile
 import pickle
 
 from log import get_logger
-from utils import get_pbar, read_offset, md5sum, mmap_open, set_file_length
+from utils import get_pbar, md5sum, mmap_open, set_file_length, get_file_type
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
 # Logging
@@ -45,7 +45,12 @@ class SegmentProducer(object):
         self.pbar = get_pbar(file_id, size)
 
         # Create file if needed and schedule work
-        set_file_length(self.file_path, self.size)
+        try:
+            set_file_length(self.file_path, self.size)
+        except:
+            log.error('Unable to set file length! File appears to'
+                      'be a {} file, attempting to proceed regardless'.format(
+                          get_file_type(self.file_path)))
         self.schedule()
 
     def integrate(self, itree):
@@ -89,7 +94,7 @@ class SegmentProducer(object):
             load_path))
 
         if not os.path.isfile(self.file_path):
-            log.error('State file found but no file for {}.'.format(
+            log.error('State file found but no file for {}. '.format(
                 self.file_id) + 'Restarting entire download.')
             return
         try:
