@@ -28,6 +28,15 @@
  *           permissions and limitations under the License.)
  *
  ******************************************************************************/
+#ifndef __CBUFFER_H__
+#define __CBUFFER_H__
+
+#include <unistd.h>
+#include <cstdlib>
+#include <pthread.h>
+#include <cstring>
+#include <cstdio>
+#include <algorithm>
 
 class CircularBuffer
 {
@@ -67,3 +76,5 @@ private:
     bool closed_;
     char *data_;
 };
+
+#endif //__CBUFFER_H__
