@@ -258,12 +258,13 @@ void *thread_udt2tcp(void *_args_)
     /*******************************************************************
      * Begin proxy procedure
      ******************************************************************/
+    CircularBuffer *cbuffer = new CircularBuffer(CIRCULAR_BUFF_SIZE);
 
     /* Create UDT to pipe thread */
     pthread_t udt2pipe_thread;
     udt_pipe_args_t *udt2pipe_args = (udt_pipe_args_t*)malloc(sizeof(udt_pipe_args_t));
     udt2pipe_args->udt_socket = args->udt_socket;
-    udt2pipe_args->pipe = pipefd[1];
+    udt2pipe_args->pipe = cbuffer;
     debug("Creating udt2pipe thread");
     if (pthread_create(&udt2pipe_thread, NULL, udt2pipe, udt2pipe_args)){
         error("unable to create udt2pipe thread");
@@ -274,13 +275,15 @@ void *thread_udt2tcp(void *_args_)
     /* Create pipe to TCP args */
     tcp_pipe_args_t *pipe2tcp_args = (tcp_pipe_args_t*)malloc(sizeof(tcp_pipe_args_t));
     pipe2tcp_args->tcp_socket = args->tcp_socket;
-    pipe2tcp_args->pipe = pipefd[0];
+    pipe2tcp_args->pipe = cbuffer;
     debug("Calling pipe2tcp thread");
     pipe2tcp(pipe2tcp_args);  // There is no reason not to block on this now
 
     /* Join transcriber thread */
     void *ret;
     pthread_join(udt2pipe_thread, &ret);
+
+    delete cbuffer;
 
     return NULL;
 }
