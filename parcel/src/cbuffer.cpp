@@ -30,9 +30,10 @@ CircularBuffer::CircularBuffer(size_t capacity)
 
 CircularBuffer::~CircularBuffer()
 {
-    /* pthread_mutex_destroy(&); */
-    /* pthread_cond_destroy(&cbc->notfull); */
-    /* pthread_cond_destroy(&cbc->notempty); */
+    pthread_mutex_destroy(&pointer_mutex_);
+    pthread_mutex_destroy(&cond_mutex_);
+    pthread_cond_destroy(&space_cond_);
+    pthread_cond_destroy(&data_cond_);
     delete [] data_;
 }
 
@@ -42,8 +43,17 @@ CircularBuffer::~CircularBuffer()
 
 size_t CircularBuffer::write_nonblocking(const char *data, size_t bytes)
 {
-    if (bytes == 0){ return  0; }
+    /*
+     *  write_nonblocking() - Non blocking write to buffer
+     *
+     *  Write to the circular buffer, if there is no space, do not
+     *  block, but write 0 bytes.
+     *
+     *  returns: The number of bytes written to buffer on success, -1
+     *  on failure.
+     */
     if (closed_)   { return -1; }
+    if (bytes == 0){ return  0; }
 
     /* Lock and calculate sizes */
     pthread_mutex_lock(&pointer_mutex_);
@@ -69,8 +79,8 @@ size_t CircularBuffer::write_nonblocking(const char *data, size_t bytes)
     pthread_mutex_lock(&pointer_mutex_);
     if (single_step){
         end_index_ += bytes_to_write;
-        /* Loop back */
         if (end_index_ == capacity){
+            /* Loop back */
             end_index_ = 0;
         }
     } else {
@@ -84,8 +94,18 @@ size_t CircularBuffer::write_nonblocking(const char *data, size_t bytes)
 
 size_t CircularBuffer::write(const char *data, size_t bytes)
 {
-    if (bytes == 0){ return  0; }
+    /*
+     *  write_nonblocking() - Blocking write to buffer
+     *
+     *  Write to the circular buffer, if there is not enough space
+     *  write what we can and block until someone else has read from
+     *  the buffer.
+     *
+     *  returns: The number of bytes written to buffer on success, -1
+     *  on failure.
+     */
     if (closed_)   { return -1; }
+    if (bytes == 0){ return  0; }
 
     debug("Writing %li bytes to CircularBuffer %p", bytes, this);
     size_t bytes_written = 0;
@@ -114,8 +134,17 @@ size_t CircularBuffer::write(const char *data, size_t bytes)
 
 size_t CircularBuffer::read_nonblocking(char *data, size_t bytes)
 {
-    if (bytes == 0){ return  0; }
+    /*
+     *  read_nonblocking() - Nonblocking read from buffer
+     *
+     *  Read from the pipe at most size_t bytes.  If there is no data,
+     *  read 0 bytes and immediately return 0;
+     *
+     *  returns: The number of bytes read from buffer on success, -1
+     *  on failure.
+     */
     if (closed_)   { return -1; }
+    if (bytes == 0){ return  0; }
 
     pthread_mutex_lock(&pointer_mutex_);
     size_t capacity       = capacity_;
@@ -137,8 +166,8 @@ size_t CircularBuffer::read_nonblocking(char *data, size_t bytes)
     pthread_mutex_lock(&pointer_mutex_);
     if (single_step){
         beg_index_ += bytes_to_read;
-        /* Loop back */
         if (beg_index_ == capacity){
+            /* Loop back */
             beg_index_ = 0;
         }
     } else {
@@ -147,13 +176,20 @@ size_t CircularBuffer::read_nonblocking(char *data, size_t bytes)
     size_ -= bytes_to_read;
     pthread_mutex_unlock(&pointer_mutex_);
 
-    debug("Read %li bytes from CircularBuffer %p", bytes_to_read, this);
-
     return bytes_to_read;
 }
 
 size_t CircularBuffer::read(char *data, size_t bytes)
 {
+    /*
+     *  read_nonblocking() - Blocking read from buffer
+     *
+     *  Read from the pipe at most size_t bytes.  If there is no data,
+     *  wait for a signal saying somebody wrote to the pipe.
+     *
+     *  returns: The number of bytes read from buffer on success, -1
+     *  on failure.
+     */
     if (!size()){
         wait_for_data();
     }
@@ -170,6 +206,12 @@ size_t CircularBuffer::read(char *data, size_t bytes)
 
 void CircularBuffer::wait_for_space()
 {
+    /*
+     *  wait_for_space() - Block until there is space to write to
+     *
+     *  If there is no space in the buffer, wait for a signal saying
+     *  that someone read from the buffer.
+     */
     pthread_mutex_lock(&cond_mutex_);
     while (!has_space()){
         pthread_cond_wait(&space_cond_, &cond_mutex_);
@@ -179,6 +221,12 @@ void CircularBuffer::wait_for_space()
 
 void CircularBuffer::wait_for_data()
 {
+    /*
+     *  wait_for_data() - Block until there is data to read
+     *
+     *  If there is no data in the buffer, wait for a signal saying
+     *  that someone write to the buffer.
+     */
     pthread_mutex_lock(&cond_mutex_);
     while (!size()){
         pthread_cond_wait(&data_cond_, &cond_mutex_);
@@ -188,6 +236,12 @@ void CircularBuffer::wait_for_data()
 
 void CircularBuffer::signal_space()
 {
+    /*
+     *  signal_space() - Send signal saying there is new space
+     *
+     *  Send signal telling any threads waiting on space to write to
+     *  wake up.
+     */
     pthread_mutex_lock(&cond_mutex_);
     pthread_cond_signal(&space_cond_);
     pthread_mutex_unlock(&cond_mutex_);
@@ -195,6 +249,12 @@ void CircularBuffer::signal_space()
 
 void CircularBuffer::signal_data()
 {
+    /*
+     *  signal_data() - Send signal saying there is new data
+     *
+     *  Send signal telling any threads waiting on data to read to
+     *  wake up.
+     */
     pthread_mutex_lock(&cond_mutex_);
     pthread_cond_signal(&data_cond_);
     pthread_mutex_unlock(&cond_mutex_);
