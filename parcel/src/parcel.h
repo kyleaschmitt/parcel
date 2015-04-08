@@ -45,6 +45,7 @@
 
 /* Non standard libraries */
 #include <udt>
+#include "cbuffer.h"
 
 /******************************************************************************/
 #define BUFF_SIZE 67108864
@@ -58,43 +59,6 @@
 
 /******************************************************************************/
 using namespace std;
-
-/******************************************************************************
- * file: cbuffer.cpp
- *
- ******************************************************************************/
-class CircularBuffer
-{
-public:
-    CircularBuffer(size_t capacity);
-    ~CircularBuffer();
-
-    /* True if there is space is available to write to */
-    bool has_space () const { return (capacity_ - size_ > 1); }
-    /* How many bytes are currently in the buffer */
-    size_t size      () const { return size_;     }
-    /* Total capacity */
-    size_t capacity  () const { return capacity_; }
-    /* Close the buffer */
-    void   close     ()       { closed_ = true;   }
-    size_t read_nonblocking(char *data, size_t bytes);
-    size_t write_nonblocking(const char *data, size_t bytes);
-    /* Return number of bytes written. */
-    size_t write(const char *data, size_t bytes);
-    /* Return number of bytes read. */
-    size_t read(char *data, size_t bytes);
-    void wait_for_space();
-    void wait_for_data();
-    void signal_space();
-    void signal_data();
-
-private:
-    size_t beg_index_, end_index_, size_, capacity_;
-    pthread_cond_t space_cond_, data_cond_;
-    pthread_mutex_t cond_mutex_, pointer_mutex_;
-    bool closed_;
-    char *data_;
-};
 
 /******************************************************************************
  * thread arg structures

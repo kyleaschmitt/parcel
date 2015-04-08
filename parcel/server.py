@@ -1,4 +1,3 @@
-import atexit
 import signal
 import urlparse
 from cparcel import lib
