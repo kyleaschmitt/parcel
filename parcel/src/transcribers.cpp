@@ -60,7 +60,7 @@ void *udt2pipe(void *_args_)
             debug("Failed to write to pipe.");
             goto cleanup;
         }
-        debug("Writing %d bytes to pipe", read_size);
+        debug("Writing %d bytes to pipe from UDT", read_size);
     }
 
  cleanup:
@@ -92,7 +92,7 @@ void *tcp2pipe(void *_args_)
             debug("Failed to write to pipe");
             goto cleanup;
         }
-        debug("Wrote %d bytes to pipe", read_size);
+        debug("Wrote %d bytes to pipe from TCP", read_size);
     }
 
  cleanup:
