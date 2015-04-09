@@ -11,6 +11,8 @@ setup(
     ],
     scripts=[
         'bin/parcel',
-        'bin/parcel-server'
+        'bin/parcel-server',
+        'bin/parcel-tcp2udt',
+        'bin/parcel-udt2tcp',
     ]
 )

@@ -3,8 +3,14 @@
  * http://www.asawicki.info/news_1468_circular_buffer_of_raw_binary_data_in_c.html
  * and modified to be thread safe for posix systems and to block on
  * write
+ *
+ * DESCRIPTION: Circular buffer to emulate an arbitrary sized pipe
+ *              with blocking reads and writes.
  */
-#include "parcel.h"
+
+#include "cbuffer.h"
+
+using namespace std;
 
 CircularBuffer::CircularBuffer(size_t capacity)
     : beg_index_(0)
@@ -58,7 +64,7 @@ size_t CircularBuffer::write_nonblocking(const char *data, size_t bytes)
     /* Lock and calculate sizes */
     pthread_mutex_lock(&pointer_mutex_);
     size_t capacity        = capacity_;
-    size_t bytes_to_write  = std::min(bytes, capacity - size_);
+    size_t bytes_to_write  = min(bytes, capacity - size_);
     size_t size_1          = capacity - end_index_;
     size_t size_2          = bytes_to_write - size_1;
     bool   single_step     = (bytes_to_write <= capacity - end_index_);
@@ -107,7 +113,6 @@ size_t CircularBuffer::write(const char *data, size_t bytes)
     if (closed_)   { return -1; }
     if (bytes == 0){ return  0; }
 
-    debug("Writing %li bytes to CircularBuffer %p", bytes, this);
     size_t bytes_written = 0;
     if (!has_space()){
         wait_for_space();
@@ -120,7 +125,6 @@ size_t CircularBuffer::write(const char *data, size_t bytes)
         size_t written_this_time = write_nonblocking(data  + bytes_written,
                                                      bytes - bytes_written);
         bytes_written += written_this_time;
-        debug("Wrote %li bytes to CircularBuffer %p", written_this_time, this);
     }
     if (bytes_written > 0) {
         signal_data();
@@ -148,7 +152,7 @@ size_t CircularBuffer::read_nonblocking(char *data, size_t bytes)
 
     pthread_mutex_lock(&pointer_mutex_);
     size_t capacity       = capacity_;
-    size_t bytes_to_read  = std::min(bytes, size_);
+    size_t bytes_to_read  = min(bytes, size_);
     size_t size_1         = capacity - beg_index_;
     size_t size_2         = bytes_to_read - size_1;
     bool   single_step    = (bytes_to_read <= capacity - beg_index_);
