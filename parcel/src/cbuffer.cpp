@@ -3,6 +3,9 @@
  * http://www.asawicki.info/news_1468_circular_buffer_of_raw_binary_data_in_c.html
  * and modified to be thread safe for posix systems and to block on
  * write
+ *
+ * DESCRIPTION: Circular buffer to emulate an arbitrary sized pipe
+ *              with blocking reads and writes.
  */
 
 #include "cbuffer.h"
