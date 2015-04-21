@@ -1,4 +1,6 @@
 from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
+from stat import S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, \
+    S_ISLNK, S_ISSOCK
 
 import os
 from const import GB
@@ -46,28 +48,60 @@ def print_download_information(file_id, size, name, path):
 
 
 def write_offset(path, data, offset):
-    f = open(path, 'r+b')
-    f.seek(offset)
-    f.write(data)
-    f.close()
+    try:
+        f = open(path, 'r+b')
+        f.seek(offset)
+        f.write(data)
+        f.close()
+    except Exception as e:
+        raise Exception('Unable to write offset: {}'.format(str(e)))
 
 
 def read_offset(path, offset, size):
-    f = open(path, 'r+b')
-    f.seek(offset)
-    data = f.read(size)
-    f.close()
-    return data
+    try:
+        f = open(path, 'r+b')
+        f.seek(offset)
+        data = f.read(size)
+        f.close()
+        return data
+    except Exception as e:
+        raise Exception('Unable to read offset: {}'.format(str(e)))
 
 
 def set_file_length(path, length):
-    if os.path.isfile(path) and os.path.getsize(path) == length:
-        return
-    f = open(path, 'wb')
-    f.seek(length-1)
-    f.write('\0')
-    f.truncate()
-    f.close()
+    try:
+        if os.path.isfile(path) and os.path.getsize(path) == length:
+            return
+        f = open(path, 'wb')
+        f.seek(length-1)
+        f.write('\0')
+        f.truncate()
+        f.close()
+    except Exception as e:
+        raise Exception('Unable to set file length: {}'.format(str(e)))
+
+
+def get_file_type(path):
+    try:
+        mode = os.stat(path).st_mode
+        if S_ISDIR(mode):
+            return 'directory'
+        elif S_ISCHR(mode):
+            return 'character device'
+        elif S_ISBLK(mode):
+            return 'block device'
+        elif S_ISREG(mode):
+            return 'regular'
+        elif S_ISFIFO(mode):
+            return 'fifo'
+        elif S_ISLNK(mode):
+            return 'link'
+        elif S_ISSOCK(mode):
+            return 'socket'
+        else:
+            return 'unknown'
+    except Exception as e:
+        raise RuntimeError('Unable to get file type: {}'.format(str(e)))
 
 
 def calculate_segments(start, stop, block):
@@ -86,6 +120,13 @@ def md5sum(block):
 
 @contextmanager
 def mmap_open(path):
-    with open(path, "r+b") as f:
-        mm = mmap.mmap(f.fileno(), 0)
-        yield mm
+    try:
+        with open(path, "r+b") as f:
+            mm = mmap.mmap(f.fileno(), 0)
+            yield mm
+    except Exception as e:
+        raise RuntimeError('Unable to get file type: {}'.format(str(e)))
+
+
+def STRIP(comment):
+    return ' '.join(comment.split())

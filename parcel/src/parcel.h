@@ -45,9 +45,11 @@
 
 /* Non standard libraries */
 #include <udt>
+#include "cbuffer.h"
 
 /******************************************************************************/
 #define BUFF_SIZE 67108864
+#define CIRCULAR_BUFF_SIZE 4*BUFF_SIZE
 #define MSS 8400
 #define EXTERN extern "C"
 #define LOG
@@ -77,12 +79,12 @@ typedef struct transcriber_args_t {
 
 typedef struct udt_pipe_args_t {
     UDTSOCKET udt_socket;
-    int pipe;
+    CircularBuffer *pipe;
 } udt_pipe_args_t;
 
 typedef struct tcp_pipe_args_t {
     int tcp_socket;
-    int pipe;
+    CircularBuffer *pipe;
 } tcp_pipe_args_t;
 
 /******************************************************************************

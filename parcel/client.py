@@ -9,8 +9,7 @@ import urlparse
 from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from utils import print_download_information, set_file_length, write_offset, \
-    md5sum
+from utils import print_download_information, write_offset, md5sum
 
 # Logging
 log = get_logger('client')
@@ -26,7 +25,8 @@ def download_worker(client, path, file_id, producer):
 
 class Client(object):
 
-    def __init__(self, uri, token, n_procs, directory, segment_md5sums=False):
+    def __init__(self, uri, token, n_procs, directory,
+                 segment_md5sums=False, debug=False):
         """Creates a parcel client object.
 
         :param str uri:
@@ -46,6 +46,7 @@ class Client(object):
         self.uri = uri if uri.endswith('/') else uri + '/'
         self.directory = directory
         self.segment_md5sums = segment_md5sums
+        self.debug = debug
 
         # Nullify timers
         self.start, self.stop = None, None
@@ -274,6 +275,8 @@ class Client(object):
             except Exception as e:
                 log.error('Unable to download {}: {}'.format(
                     file_id, str(e)))
+                if self.debug:
+                    raise
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.
