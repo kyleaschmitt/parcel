@@ -15,6 +15,8 @@ def parcel_build(command_subclass):
         except Exception as e:
             logging.error(
                 "Unable to build UDT library: {}".format(e))
+        if isinstance(self, install):
+            install.do_egg_install(self)
         else:
             original(self)
 
@@ -23,12 +25,12 @@ def parcel_build(command_subclass):
 
 
 @parcel_build
-class ParcelInstall(install):
+class ParcelDevelop(develop):
     pass
 
 
 @parcel_build
-class ParcelDevelop(develop):
+class ParcelInstall(install):
     pass
 
 
