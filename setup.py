@@ -1,12 +1,14 @@
 from setuptools import setup
-from distutils.command.install import install as DistutilsInstall
 from subprocess import check_call, call
 import logging
+from setuptools.command.develop import develop
+from setuptools.command.install import install
 
 
-class ParcelInstall(DistutilsInstall):
+def parcel_build(command_subclass):
+    original = command_subclass.run
 
-    def run(self):
+    def parcel_run(self):
         try:
             call(['make', 'clean'])
             check_call(['make'])
@@ -14,13 +16,28 @@ class ParcelInstall(DistutilsInstall):
             logging.error(
                 "Unable to build UDT library: {}".format(e))
         else:
-            DistutilsInstall.run(self)
+            original(self)
+
+    command_subclass.run = parcel_run
+    return command_subclass
+
+
+@parcel_build
+class ParcelInstall(install):
+    pass
+
+
+@parcel_build
+class ParcelDevelop(develop):
+    pass
+
 
 setup(
     name='parcel',
     packages=["parcel"],
     cmdclass={
         'install': ParcelInstall,
+        'develop': ParcelDevelop,
     },
     install_requires=[
         'requests==2.6.0',
