@@ -5,9 +5,8 @@ set -e
 # ======== Make/install parcel lib ========
 make clean
 make
-sudo -E make install
 
 # ======== Install python package ========
 set +e
-yes | sudo $(which pip) uninstall parcel
-sudo -E $(which python) setup.py install
+yes | pip uninstall parcel >> /dev/null &2>1
+python setup.py install
