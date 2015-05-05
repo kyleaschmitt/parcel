@@ -1,4 +1,4 @@
-from multiprocessing import Process
+# If windows, don't attempt to load library
 from intervaltree import Interval
 import os
 import time
@@ -10,6 +10,13 @@ from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
 from utils import print_download_information, write_offset, md5sum
+
+# Are we running on windows?
+if os.name == 'nt':
+    from threading import Thread as Process
+else:
+    # Assume a posix system
+    from multiprocessing import Process
 
 # Logging
 log = get_logger('client')

@@ -8,16 +8,22 @@ from utils import STRIP
 log = get_logger('client')
 PACKAGE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'src')
 
-# Load library
-try:
-    _lib = cdll.LoadLibrary(os.path.join(PACKAGE_DIR, 'lparcel.so'))
-    # Signal handling for external calls
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-except:
-    log.warn(STRIP("""
-    Unable to load parcel udt library. Will proceed with http option only."""))
+# If windows, don't attempt to load library
+if os.name == 'nt':
     _lib = None
-    raise
+
+# else assume a posix system
+else:
+    # Load library
+    try:
+        _lib = cdll.LoadLibrary(os.path.join(PACKAGE_DIR, 'lparcel.so'))
+        # Signal handling for external calls
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+    except:
+        log.warn(STRIP("""
+        Unable to load parcel udt library. Will proceed with http option only.
+        """))
+        _lib = None
 
 
 def no_parcel_lib(*args, **kwargs):
