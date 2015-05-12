@@ -9,9 +9,9 @@ import urlparse
 from segment import SegmentProducer
 from const import HTTP_CHUNK_SIZE
 from log import get_logger
-from utils import print_download_information, write_offset, md5sum
+from utils import print_download_information, write_offset, md5sum,\
+    print_closing_header, print_opening_header
 
-# Logging
 log = get_logger('client')
 
 
@@ -40,7 +40,6 @@ class Client(object):
             The directory to which any data will be downloaded
 
         """
-
         self.token = token
         self.n_procs = n_procs
         self.uri = uri if uri.endswith('/') else uri + '/'
@@ -123,7 +122,7 @@ class Client(object):
         size = long(r.headers['Content-Length'])
         log.info('Request responded: {} bytes'.format(size))
         attachment = r.headers.get('content-disposition', None)
-        name = attachment.split('filename=')[-1] if attachment else 'untitled'
+        name = attachment.split('filename=')[-1] if attachment else None
         return name, size
 
     ############################################################
@@ -139,9 +138,11 @@ class Client(object):
         """
 
         if actual != expected:
-            raise ValueError(
+            log.error(
                 'Transfer size incorrect: {} != {} expected'.format(
                     actual, expected))
+            return False
+        return True
 
     def get_file_path(self, file_id, file_name):
         """Function to standardize the output path for a download.
@@ -152,8 +153,26 @@ class Client(object):
 
         """
 
-        return os.path.join(self.directory, '{}_{}'.format(
-            file_id, file_name))
+        if file_name:
+            return os.path.join(self.directory, '{}_{}'.format(
+                file_id, file_name))
+        else:
+            return os.path.join(self.directory, file_id)
+
+    def get_state_file_path(self, file_id, file_name):
+        """Function to standardize the state path for a download.
+
+        :param str file_id: The id of the file
+        :param str file_name: The file name
+        :returns: A string specifying the full download path
+
+        """
+
+        if file_name:
+            return os.path.join(self.directory, '.{}_{}.parcel'.format(
+                file_id, file_name))
+        else:
+            return os.path.join(self.directory, '.{}.parcel'.format(file_id))
 
     def read_write_segment(self, path, file_id, interval, q_complete):
         """Read data from the data server and write it to a file.
@@ -196,7 +215,10 @@ class Client(object):
             segment = Interval(offset, offset+len(chunk), iv_data)
             q_complete.put(segment)
 
-        self.check_transfer_size(written, interval.end - interval.begin)
+        if not self.check_transfer_size(
+                written, interval.end - interval.begin):
+            return self.read_write_segment(
+                path, file_id, interval, q_complete)
         return written
 
     ############################################################
@@ -246,7 +268,8 @@ class Client(object):
         self.stop_time = time.time()
         if file_size > 0:
             rate = (int(file_size)*8/1e9) / (self.stop_time - self.start_time)
-            log.info('Download complete: {0:.2f} Gbps average'.format(rate))
+            log.info(
+                'Download complete: {0:.2f} Gbps average'.format(rate))
 
     ############################################################
     #                     Main download
@@ -277,6 +300,8 @@ class Client(object):
                     file_id, str(e)))
                 if self.debug:
                     raise
+            finally:
+                print_closing_header(file_id)
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.
@@ -287,12 +312,12 @@ class Client(object):
         """
 
         # File informaion
+        print_opening_header(file_id)
         name, size = self.request_file_information(file_id)
         path = self.get_file_path(file_id, name)
 
         # Where to load and save download state
-        save_path = '{path}.state'.format(path=path)
-        load_path = save_path
+        state_path = self.get_state_file_path(file_id, name)
 
         self.initialize_file_download(file_id, name, path, size)
 
@@ -300,8 +325,8 @@ class Client(object):
         producer = SegmentProducer(
             file_id=file_id,
             file_path=path,
-            save_path=save_path,
-            load_path=load_path,
+            save_path=state_path,
+            load_path=state_path,
             n_procs=self.n_procs,
             size=size,
             check_segment_md5sums=self.segment_md5sums,

@@ -9,8 +9,7 @@ from utils import get_pbar, md5sum, mmap_open, set_file_length,\
     get_file_type, STRIP
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
-# Logging
-log = get_logger('client')
+log = get_logger('segment')
 
 
 class SegmentProducer(object):
@@ -79,7 +78,7 @@ class SegmentProducer(object):
                 chunk = data[interval.begin:interval.end]
                 checksum = md5sum(chunk)
                 if checksum != interval.data.get('md5sum'):
-                    log.warn('Corrupt segment {}, {}. Redownloading.'.format(
+                    log.warn('Redownloading corrupt segment {}, {}.'.format(
                         interval, checksum))
                     self.completed.remove(interval)
 
@@ -88,6 +87,16 @@ class SegmentProducer(object):
         self.work_pool = IntervalTree([Interval(0, size)])
         self.completed = IntervalTree()
         self.size_complete = 0
+
+        if not os.path.isfile(load_path) and os.path.isfile(self.file_path):
+            log.warn(STRIP(
+                """A file named '{} was found but no state file was found at at
+                '{}'. Either this file was downloaded to a different
+                location, the state file was moved, or the state file
+                was deleted.  Parcel refuses to claim the file has
+                been successfully downloaded and will restart the
+                download.\n""").format(self.file_path, load_path))
+            return
 
         if not os.path.isfile(load_path):
             return
@@ -99,9 +108,9 @@ class SegmentProducer(object):
 
         if not os.path.isfile(self.file_path):
             log.warn(STRIP(
-                """State file found but no file for {}.
+                """State file found at '{}' but no file for {}.
                 Restarting entire download.""".format(
-                    self.file_id)))
+                    load_path, self.file_id)))
             return
         try:
             with open(load_path, "rb") as f:
