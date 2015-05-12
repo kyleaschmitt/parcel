@@ -25,7 +25,8 @@ class UDTClient(Client):
         """
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'
-        local_uri = '{}://{}:{}/'.format(p.scheme, proxy_host, proxy_port)
+        local_uri = '{}://{}:{}{}'.format(
+            p.scheme, proxy_host, proxy_port, p.path)
         return local_uri
 
     def start_proxy_server(self, proxy_host, proxy_port, remote_uri):

@@ -6,18 +6,24 @@ from utils import STRIP
 
 # Logging
 log = get_logger('client')
+PACKAGE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'src')
 
-INSTALL_PATH = os.path.join('/usr', 'local', 'lib')
-
-# Load library
-try:
-    _lib = cdll.LoadLibrary(os.path.join(INSTALL_PATH, 'lparcel.so'))
-    # Signal handling for external calls
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-except:
-    log.warn(STRIP("""
-    Unable to load parcel udt library. Will proceed with http option only."""))
+# If windows, don't attempt to load library
+if os.name == 'nt':
     _lib = None
+
+# else assume a posix system
+else:
+    # Load library
+    try:
+        _lib = cdll.LoadLibrary(os.path.join(PACKAGE_DIR, 'lparcel.so'))
+        # Signal handling for external calls
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+    except:
+        log.warn(STRIP("""
+        Unable to load parcel udt library. Will proceed with http option only.
+        """))
+        _lib = None
 
 
 def no_parcel_lib(*args, **kwargs):
@@ -25,7 +31,7 @@ def no_parcel_lib(*args, **kwargs):
         C++ parcel dynamic library failed to load. Either it was not
         installed to the system path at {} or the udt parcel is
         currently not compatible with your machine.
-        """.format(INSTALL_PATH)))
+        """.format(PACKAGE_DIR)))
 
 
 class ParcelDLL(object):

@@ -1,8 +1,17 @@
 from intervaltree import Interval, IntervalTree
-from multiprocessing import Manager
 import os
 import tempfile
 import pickle
+
+if os.name == 'nt':
+    WINDOWS = True
+    from Queue import Queue
+else:
+    # if we are running on a posix system, then we will be
+    # communicating across processes, and will need
+    # multiprocessing manager
+    from multiprocessing import Manager
+    WINDOWS = False
 
 from log import get_logger
 from utils import get_pbar, md5sum, mmap_open, set_file_length,\
@@ -29,9 +38,13 @@ class SegmentProducer(object):
         self.is_regular_file = False
 
         # Setup producer
-        self.manager = Manager()
-        self.q_work = self.manager.Queue()
-        self.q_complete = self.manager.Queue()
+        if WINDOWS:
+            self.q_work = Queue()
+            self.q_complete = Queue()
+        else:
+            manager = Manager()
+            self.q_work = manager.Queue()
+            self.q_complete = manager.Queue()
 
         # Setup work pool
         self.load_state(load_path, size)
