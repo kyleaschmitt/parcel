@@ -17,7 +17,6 @@ except:
     log.warn(STRIP("""
     Unable to load parcel udt library. Will proceed with http option only."""))
     _lib = None
-    raise
 
 
 def no_parcel_lib(*args, **kwargs):
