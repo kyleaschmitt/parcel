@@ -10,8 +10,8 @@ log = get_logger('parcel_client')
 
 HTTP = 'http'
 UDT = 'udt'
-TCP_DEFAULT_N_THREADS = 4
-UDT_DEFAULT_N_THREADS = 2
+TCP_DEFAULT_N_THREADS = 8
+UDT_DEFAULT_N_THREADS =8
 
 
 def get_client(args, token):

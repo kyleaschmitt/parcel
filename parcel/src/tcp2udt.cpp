@@ -244,9 +244,9 @@ void *thread_tcp2udt(void *_args_)
      */
     debug("Waiting on TCP socket ready");
     while (!args->tcp_socket){
-        // TODO: Add semaphore on socket ready, pthread_yield is a
+        // TODO: Add semaphore on socket ready, usleep is a
         // lazy solution for now
-        pthread_yield();
+        usleep(100);
     }
     debug("TCP socket ready: %d", args->tcp_socket);
 

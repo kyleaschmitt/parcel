@@ -52,7 +52,7 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     addrinfo* res;
     int mss = MSS;
     int reuseaddr = 1;
-    int udt_buffer_size = BUFF_SIZE;
+    int udt_buffer_size = BUFF_SIZE*2;
     int udp_buffer_size = BUFF_SIZE;
     UDTSOCKET udt_socket;
 
@@ -226,9 +226,9 @@ void *thread_udt2tcp(void *_args_)
      */
     debug("Waiting on UDT socket ready");
     while (!args->udt_socket){
-        // TODO: Add semaphore on socket ready, pthread_yield is a
+        // TODO: Add semaphore on socket ready, usleep is a
         // lazy solution for now
-        pthread_yield();
+        usleep(100);
     }
     debug("UDT socket ready: %d", args->udt_socket);
 

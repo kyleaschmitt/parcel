@@ -37,10 +37,19 @@ def get_pbar(file_id, maxval, start_val=0):
     return pbar
 
 
+def print_opening_header(file_id):
+    log.info('')
+    log.info('v{}v'.format('{s:{c}^{n}}'.format(
+        s=' {} '.format(file_id), n=50, c='-')))
+
+
+def print_closing_header(file_id):
+    log.info('^{}^'.format('{s:{c}^{n}}'.format(
+        s=' {} '.format(file_id), n=50, c='-')))
+
+
 def print_download_information(file_id, size, name, path):
-    log.info('-'*40)
     log.info('Starting download   : {}'.format(file_id))
-    log.info('-'*40)
     log.info('File name           : {}'.format(name))
     log.info('Download size       : {} B ({:.2f} GB)'.format(
         size, (size / float(GB))))
