@@ -48,9 +48,20 @@
 #include "cbuffer.h"
 
 /******************************************************************************/
-#define BUFF_SIZE 67108864
-#define CIRCULAR_BUFF_SIZE 4*BUFF_SIZE
+#if __APPLE__
+/* Set a lower buffer size to 1MiB due to OSX restrictions */
+#define BUFF_SIZE 1048567
 #define MSS 8400
+#else
+/*  Otherwise attempt to use a 64MiB buffer for all other systems.
+ *  This 64MiB buffer size is (1) recommended (2) empirically verified
+ *  to have given the best performance
+ */
+#define BUFF_SIZE 67108864
+#define MSS 8400
+#endif
+
+#define CIRCULAR_BUFF_SIZE 4*BUFF_SIZE
 #define EXTERN extern "C"
 #define LOG
 
