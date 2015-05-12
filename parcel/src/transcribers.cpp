@@ -56,16 +56,16 @@ void *udt2pipe(void *_args_)
 
         /* Write to pipe */
         debug("Writing %d bytes to pipe", read_size);
-        if (write(args->pipe, buffer, read_size) <= 0){
+        if (args->pipe->write(buffer, read_size) <= 0){
             debug("Failed to write to pipe.");
             goto cleanup;
         }
-        debug("Writing %d bytes to pipe", read_size);
+        debug("Writing %d bytes to pipe from UDT", read_size);
     }
 
  cleanup:
     debug("Exiting udt2pipe thread.");
-    close(args->pipe);
+    args->pipe->close();
     return NULL;
 }
 
@@ -88,16 +88,16 @@ void *tcp2pipe(void *_args_)
         debug("Read %d bytes from TCP socket %d", read_size, args->tcp_socket);
 
         /* Write to pipe */
-        if (write(args->pipe, buffer, read_size) <= 0){
+        if (args->pipe->write(buffer, read_size) <= 0){
             debug("Failed to write to pipe");
             goto cleanup;
         }
-        debug("Wrote %d bytes to pipe", read_size);
+        debug("Wrote %d bytes to pipe from TCP", read_size);
     }
 
  cleanup:
     debug("Exiting tcp2pipe thread.");
-    close(args->pipe);
+    args->pipe->close();
     return NULL;
 }
 
@@ -115,7 +115,7 @@ void *pipe2udt(void *_args_)
 
     while (1){
         /* Read from pipe */
-        if ((read_size = read(args->pipe, buffer, BUFF_SIZE)) <= 0){
+        if ((read_size = args->pipe->read(buffer, BUFF_SIZE)) <= 0){
             debug("Unable to read from pipe.");
             goto cleanup;
         }
@@ -139,7 +139,7 @@ void *pipe2udt(void *_args_)
  cleanup:
     debug("Exiting pipe2udt thread.");
     UDT::close(args->udt_socket);
-    close(args->pipe);
+    args->pipe->close();
     return NULL;
 }
 
@@ -157,7 +157,7 @@ void *pipe2tcp(void *_args_)
 
     while (1){
         /* Read from pipe */
-        if ((read_size = read(args->pipe, buffer, BUFF_SIZE)) <= 0){
+        if ((read_size = args->pipe->read(buffer, BUFF_SIZE)) <= 0){
             debug("Unable to read from pipe.");
             goto cleanup;
         }
@@ -181,6 +181,6 @@ void *pipe2tcp(void *_args_)
  cleanup:
     debug("Exiting pipe2tcp thread.");
     close(args->tcp_socket);
-    close(args->pipe);
+    args->pipe->close();
     return NULL;
 }

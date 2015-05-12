@@ -7,8 +7,11 @@ from parcel.log import get_logger
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
+
 HTTP = 'http'
 UDT = 'udt'
+TCP_DEFAULT_N_THREADS = 4
+UDT_DEFAULT_N_THREADS = 2
 
 
 def get_client(args, token):
@@ -67,8 +70,6 @@ if __name__ == '__main__':
                                 default=os.path.abspath(os.getcwd()),
                                 help='Directory to download files to. '
                                 'Defaults to current dir')
-    general_parser.add_argument('-n', '--n-processes', type=int, default=4,
-                                help='Number of udt client connections.')
     general_parser.add_argument('server', metavar='server', type=str, nargs=1,
                                 help='The parcel server udt address server[:port]')
     general_parser.add_argument('file_ids', metavar='file_id', type=str,
@@ -103,6 +104,9 @@ if __name__ == '__main__':
     udt.add_argument('-e', '--external-proxy', action='store_true',
                      dest='external_proxy',
                      help='Do not create a local proxy but bind to an external one')
+    udt.add_argument('-n', '--n-processes', type=int,
+                     default=UDT_DEFAULT_N_THREADS,
+                     help='Number of udt client connections.')
 
     #############################################################
     #                      HTTP options
@@ -110,6 +114,9 @@ if __name__ == '__main__':
 
     http = subparsers.add_parser(HTTP, help='Download files via HTTP',
                                  parents=[general_parser])
+    http.add_argument('-n', '--n-processes', type=int,
+                      default=TCP_DEFAULT_N_THREADS,
+                      help='Number of tcp client connections.')
 
     #############################################################
     #                       Start client
