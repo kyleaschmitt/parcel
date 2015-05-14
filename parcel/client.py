@@ -12,6 +12,7 @@ from log import get_logger
 from utils import print_download_information, write_offset, md5sum,\
     print_closing_header, print_opening_header
 
+
 # Are we running on windows?
 if os.name == 'nt':
     from threading import Thread as Process

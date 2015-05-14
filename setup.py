@@ -3,6 +3,7 @@ from subprocess import check_call, call
 import logging
 from setuptools.command.develop import develop
 from setuptools.command.install import install
+from sys import platform
 
 
 def parcel_build(command_subclass):
@@ -34,8 +35,25 @@ class ParcelInstall(install):
     pass
 
 
+APP = ['bin/parcel']
+OPTIONS = {
+    'argv_emulation': True,
+    'emulate_shell_environment': True,
+}
+
+
+extra_args = {}
+if platform == 'darwin':
+    extra_args.update(dict(
+        app=APP,
+        options={'py2app': OPTIONS},
+        setup_requires=['py2app'],
+    ))
+
+
 setup(
     name='parcel',
+    verson='0.1.0',
     packages=["parcel"],
     cmdclass={
         'install': ParcelInstall,
@@ -57,5 +75,6 @@ setup(
         'bin/parcel-server',
         'bin/parcel-tcp2udt',
         'bin/parcel-udt2tcp',
-    ]
+    ],
+    **extra_args
 )
