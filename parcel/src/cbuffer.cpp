@@ -17,7 +17,7 @@ CircularBuffer::CircularBuffer(size_t capacity)
     , end_index_(0)
     , size_(0)
     , capacity_(capacity)
-   , closed_(false)
+    , closed_(false)
 {
     data_ = new char[capacity];
     if (pthread_cond_init(&space_cond_, NULL)){

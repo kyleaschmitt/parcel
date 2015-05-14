@@ -3,6 +3,16 @@ GCC := gcc
 
 APP = parcel
 
+ifndef os
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+		os = LINUX
+    endif
+    ifeq ($(UNAME_S),Darwin)
+		os = UNIX
+    endif
+endif
+
 ################################################################################
 # Paths
 ################################################################################
@@ -47,10 +57,18 @@ APP = parcel
   MISCFLAGS       = -g -fPIC -static
 # Construct compiler flags
   CCFLAGS         = $(INCLUDES) $(OPTFLAGS) $(FSFLAGS) $(ERRFLAGS) $(MISCFLAGS) -D$(os)
-# LD linkning flags
+ifeq ($(os), LINUX)
+# LD linking flags
   LDFLAGS         = -lstdc++ -lpthread -lm -ludt $(patsubst %,-L%,$(INC_DIRS))
 # Other linking flags
   LINK_FLAGS      = -shared -Wl,-soname,lparcel.so
+endif
+ifeq ($(os), UNIX)
+# LD linking flags
+  LDFLAGS         = -lstdc++ $(patsubst %,-L%,$(INC_DIRS))
+# Other linking flags
+  LINK_FLAGS      = -shared -Wl,-install_name,lparcel.so
+endif
 
 ################################################################################
 # Library objects
@@ -60,10 +78,6 @@ APP = parcel
 ################################################################################
 # OS options
 ################################################################################
-
-ifndef os
-   os = LINUX
-endif
 
 ifndef arch
    arch = IA32
@@ -83,10 +97,6 @@ endif
 
 ifeq ($(arch), SPARC)
    CCFLAGS += -DSPARC
-endif
-
-ifeq ($(os), UNIX)
-   LDFLAGS += -lsocket
 endif
 
 ifeq ($(os), SUNOS)
@@ -113,7 +123,7 @@ parcel: $(OBJECTS) $(DEP_OBJS)
 ################################################################################
 
 $(UDT_OBJECTS):
-	make -C udt4/src
+	make -C udt4/src os=$(os)
 
 ################################################################################
 # Manage library
