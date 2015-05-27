@@ -77,7 +77,7 @@ class SegmentProducer(object):
             return True
         intervals = sorted(self.completed.items())
         pbar = ProgressBar(widgets=[
-            'Checksumming {}:'.format(self.file_id), Percentage(), ' ',
+            'Checksumming {}: '.format(self.file_id), Percentage(), ' ',
             Bar(marker='#', left='[', right=']'), ' ', ETA()])
         with mmap_open(self.file_path) as data:
             for interval in pbar(intervals):

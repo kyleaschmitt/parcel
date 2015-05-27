@@ -2,7 +2,7 @@
 from intervaltree import Interval
 import os
 import time
-
+from termcolor import colored
 import requests
 import urlparse
 
@@ -34,8 +34,8 @@ def download_worker(client, path, file_id, producer):
 
 class Client(object):
 
-    def __init__(self, uri, token, n_procs, directory,
-                 segment_md5sums=False, debug=False):
+    def __init__(self, uri, token, n_procs, directory=None,
+                 segment_md5sums=True, debug=False):
         """Creates a parcel client object.
 
         :param str uri:
@@ -52,7 +52,7 @@ class Client(object):
         self.token = token
         self.n_procs = n_procs
         self.uri = uri if uri.endswith('/') else uri + '/'
-        self.directory = directory
+        self.directory = directory or os.path.abspath(os.getcwd())
         self.segment_md5sums = segment_md5sums
         self.debug = debug
 
@@ -128,7 +128,11 @@ class Client(object):
 
         headers = self.construct_header()
         r = self.make_file_request(file_id, headers, close=True)
-        size = long(r.headers['Content-Length'])
+        content_length = r.headers.get('Content-Length')
+        if not content_length:
+            raise ValueError(
+                'Unexpected response from server: missing content length.')
+        size = long(content_length)
         log.info('Request responded: {} bytes'.format(size))
         attachment = r.headers.get('content-disposition', None)
         name = attachment.split('filename=')[-1] if attachment else None
@@ -228,6 +232,7 @@ class Client(object):
                 written, interval.end - interval.begin):
             return self.read_write_segment(
                 path, file_id, interval, q_complete)
+        r.close()
         return written
 
     ############################################################
@@ -300,17 +305,36 @@ class Client(object):
         for file_id in file_ids:
             log.info('Given file id: {}'.format(file_id))
 
+        downloaded, errors = [], {}
         # Download each file
         for file_id in set(file_ids):
             try:
                 self.parallel_download(file_id, *args, **kwargs)
+                downloaded.append(file_id)
             except Exception as e:
                 log.error('Unable to download {}: {}'.format(
                     file_id, str(e)))
+                errors[file_id] = str(e)
                 if self.debug:
                     raise
             finally:
                 print_closing_header(file_id)
+
+        # Print error messages
+        self.print_summary(downloaded, errors)
+        for file_id, error in errors.iteritems():
+            print('ERROR: {}: {}'.format(file_id, error))
+
+        return downloaded, errors
+
+    def print_summary(self, downloaded, errors):
+        print('\nSUMMARY:')
+        if downloaded:
+            print('{}: {}'.format(
+                colored('Successfully downloaded:', 'green'), len(downloaded)))
+            print('{}: {}'.format(
+                colored('Failed to download:', 'red'), len(errors)))
+        print('')
 
     def parallel_download(self, file_id, verify=False):
         """Start ``self.n_procs`` to download the file.

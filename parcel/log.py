@@ -1,5 +1,6 @@
 import logging
 import sys
+from termcolor import colored
 
 loggers = {}
 
@@ -13,8 +14,11 @@ def get_logger(name='parcel'):
         return loggers[name]
     log = logging.getLogger(name)
     log.propagate = False
-    formatter = logging.Formatter(
-        '[%(asctime)s][%(name)8s][%(levelname)7s] %(message)s')
+    if sys.stdout.isatty():
+        formatter = logging.Formatter(
+            colored('%(asctime)s: %(levelname)s: ', 'blue')+'%(message)s')
+    else:
+        formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(message)s')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     log.addHandler(handler)

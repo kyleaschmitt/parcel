@@ -16,7 +16,7 @@ server_port = 8888
 class TestParcelHTTP(unittest.TestCase):
 
     def setUp(self):
-        self.files = [NamedTemporaryFile() for i in range(4)]
+        self.files = [NamedTemporaryFile() for i in range(6)]
         for f in self.files:
             f.write(str(range(random.randint(100, 300))))
             f.flush()
@@ -44,10 +44,10 @@ class TestParcelHTTP(unittest.TestCase):
         for file_id in self.file_ids:
             print file_id
             check_call(
-                ['parcel', 'http', '-v',
+                ['parcel', '-v',
                  '-n1',
                  '-d', self.dest_dir,
-                 'http://{}:{}'.format(server_host, server_port),
+                 '-s', 'http://{}:{}'.format(server_host, server_port),
                  file_id])
             self.validate_file(
                 os.path.join(gettempdir(), file_id),
@@ -58,10 +58,10 @@ class TestParcelHTTP(unittest.TestCase):
         for file_id in self.file_ids:
             print file_id
             check_call(
-                ['parcel', 'http', '-v',
+                ['parcel', '-v',
                  '-n4',
                  '-d', self.dest_dir,
-                 'http://{}:{}'.format(server_host, server_port),
+                 '-s', 'http://{}:{}'.format(server_host, server_port),
                  file_id])
             self.validate_file(
                 os.path.join(gettempdir(), file_id),

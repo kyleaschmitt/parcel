@@ -1,13 +1,9 @@
-import signal
+# import signal
 import urlparse
 from cparcel import lib
 import time
 
 from log import get_logger
-
-
-# Signal handling for external calls
-signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # Logging
 log = get_logger('server')
@@ -19,6 +15,9 @@ class Server(object):
         """
 
         """
+        # Signal handling for external calls
+        # signal.signal(signal.SIGINT, signal.SIG_DFL)
+
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'
         port = p.port or {'https': '443', 'http': '80'}[p.scheme]
