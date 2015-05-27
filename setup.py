@@ -4,7 +4,6 @@ import logging
 from setuptools.command.develop import develop
 from setuptools.command.install import install
 from sys import platform
-from parcel import version
 
 
 def parcel_build(command_subclass):
@@ -54,7 +53,7 @@ if platform == 'darwin':
 
 setup(
     name='parcel',
-    version=version,
+    version='0.0.2',
     packages=["parcel"],
     cmdclass={
         'install': ParcelInstall,
