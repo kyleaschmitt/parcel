@@ -3,12 +3,16 @@ import os
 import manifest
 from http_client import HTTPClient
 import defaults
+import shlex
+
 
 HEADER = """parcel - High Performance Download Client - Interactive mode
 Type 'help' for a list of commands or 'help <topic>' for detailed usage.
 You can execute shell commands by prepending '!', i.e. !ls.
 You can run parcel with advanced options from the command line (parcel --help).
 """
+
+TIPS = """Tip: Rather than type out path names, try dragging an dropping manifest and token files into the terminal."""
 
 BASIC_COMMANDS = """Basic commands are:
 - add        (adds ids to registry)
@@ -18,6 +22,8 @@ BASIC_COMMANDS = """Basic commands are:
 - token      (load an authorization token file)
 - cd         (move to directory you want to download to)
 - pwd        (print the current working directory)
+- set        (set advanced configuration setting)
+- settings   (list advanced configuration settings)
 - download   (download files in registry)
 """
 
@@ -30,6 +36,13 @@ class ParcelREPL(Cmd):
         Cmd.__init__(self, *args, **kwargs)
         print(HEADER)
         print(BASIC_COMMANDS)
+        print(TIPS)
+
+        self.settings = dict(
+            server=defaults.url,
+            protocol='tcp',
+            processes=defaults.processes,
+        )
 
     def _add_ids(self, ids):
         if not ids:
@@ -92,24 +105,24 @@ class ParcelREPL(Cmd):
     def help_list(self):
         print("\tList all ids registered to download. Start download with 'download'")
 
-    def do_add(self, args):
-        if not args:
+    def do_add(self, arg):
+        ids = shlex.split(arg)
+        if not ids:
             print('No ids specified.')
             self.help_add()
             return
-        ids = args.strip().split(' ')
         self._add_ids(ids)
 
     def help_add(self):
         print("add <id1> <id2>")
         print("Register ids to register to download.")
 
-    def do_remove(self, args):
-        if not args:
+    def do_remove(self, arg):
+        ids = shlex.split(arg)
+        if not ids:
             print('No ids specified.')
             self.help_remove()
             return
-        ids = args.strip().split(' ')
         self._remove_ids(ids)
 
     def help_remove(self):
@@ -117,11 +130,11 @@ class ParcelREPL(Cmd):
         print("\tremove <id1> <id2>")
         print("\tRegister ids to remove from registry.")
 
-    def do_clear(self, arg):
+    def do_reset(self, arg):
         self.file_ids = set()
         print('Cleared registered file ids.')
 
-    def help_clear(self):
+    def help_reset(self):
         print("\tRemove all registered ids.")
 
     def do_cd(self, path):
@@ -148,12 +161,16 @@ class ParcelREPL(Cmd):
         if not self.file_ids:
             self.do_list(None)
             return
-        client = HTTPClient(
-            token=self.token,
-            n_procs=defaults.processes,
-            directory=os.path.abspath(os.getcwd()),
-            uri=defaults.url)
-
+        if self.settings['protocol'] == 'tcp':
+            client = HTTPClient(
+                token=self.token,
+                n_procs=self.settings['processes'],
+                directory=os.path.abspath(os.getcwd()),
+                uri=self.settings['server'])
+        else:
+            raise RuntimeError(
+                '{} protocol not supported in interactive mode'.format(
+                    self.settings['protocol']))
         downloaded, errors = client.download_files(self.file_ids)
 
     def help_download(self):
@@ -164,6 +181,20 @@ class ParcelREPL(Cmd):
             print(HEADER)
             print(BASIC_COMMANDS)
         Cmd.do_help(self, arg)
+
+    def do_set(self, arg):
+        attr, value = shlex.split(arg)
+        if attr not in self.settings:
+            raise ValueError(
+                "{} not a valid setting. Try 'settings'.".format(attr))
+        print("Updating {} from '{}' to '{}'".format(
+            attr, self.settings[attr], value))
+        self.settings[attr] = value
+
+    def do_settings(self, arg):
+        print('-- Settings --')
+        for key, val in self.settings.iteritems():
+            print('{}: {}'.format(key, val))
 
     def do_commands(self, arg):
         self.do_help(arg)

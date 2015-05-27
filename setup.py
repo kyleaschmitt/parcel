@@ -65,6 +65,7 @@ setup(
         'Flask==0.10.1',
         'intervaltree==2.0.4',
         'termcolor==1.1.0',
+        'cmd2==0.6.8',
     ],
     package_data={
         "parcel": [
