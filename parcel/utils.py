@@ -10,6 +10,8 @@ import hashlib
 import mmap
 from contextlib import contextmanager
 import platform
+from termcolor import colored as _colored
+
 
 # Logging
 log = get_logger('utils')
@@ -23,6 +25,13 @@ elif platform.system() == 'Linux':
     OS = 'LINUX'    # Assume a posix system
 else:
     OS = None
+
+
+def colored(text, color):
+    if OS == 'WINDOWS':
+        return text
+    else:
+        return _colored(text, color)
 
 # Silence warnings from requests
 try:

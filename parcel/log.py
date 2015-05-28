@@ -1,6 +1,7 @@
 import logging
 import sys
-from termcolor import colored
+from portability import colored
+
 
 loggers = {}
 

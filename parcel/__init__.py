@@ -5,4 +5,4 @@ from client import Client
 from repl import ParcelREPL
 import pkg_resources
 import defaults
-from utils import OS
+from portability import OS, colored

@@ -1,6 +1,6 @@
 from parcel import manifest, HTTPClient, UDTClient, defaults, ParcelREPL
 from parcel.log import get_logger
-from termcolor import colored
+from parcel import colored
 import argparse
 import logging
 import sys
