@@ -72,9 +72,6 @@ class ParcelREPL(Cmd):
                "Start download with 'download'.  List ids with 'list'").format(
                    start_len - end_len, end_len))
 
-    def _tokenize(self, arg):
-
-
     def do_manifest(self, manifest_path):
         if not manifest_path:
             print('No manifest specified to load.')
