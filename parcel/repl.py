@@ -182,7 +182,7 @@ class ParcelREPL(Cmd):
         if self.settings['protocol'] == 'tcp':
             client = HTTPClient(
                 token=self.token,
-                n_procs=self.settings['processes'],
+                n_procs=int(self.settings['processes']),
                 directory=os.path.abspath(os.getcwd()),
                 uri=self.settings['server'])
         else:

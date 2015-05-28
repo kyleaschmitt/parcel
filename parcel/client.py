@@ -2,7 +2,7 @@
 from intervaltree import Interval
 import os
 import time
-from termcolor import colored
+from portability import colored
 import requests
 import urlparse
 
