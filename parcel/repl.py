@@ -68,7 +68,8 @@ class ParcelREPL(Cmd):
             except Exception as msg:
                 print('Unable to remove id {}: {}'.format(fid, msg))
         end_len = len(self.file_ids)
-        print(("Removed {} file ids.  There are {} file ids to download.\n"
+        print(("Removed {} file ids from registry.\n"
+               "There are {} file ids left to download.\n"
                "Start download with 'download'.  List ids with 'list'").format(
                    start_len - end_len, end_len))
 
