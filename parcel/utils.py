@@ -9,9 +9,20 @@ import requests
 import hashlib
 import mmap
 from contextlib import contextmanager
+import platform
 
 # Logging
 log = get_logger('utils')
+
+# Are we running on windows?
+if platform.system() == 'Windows':
+    OS = 'WINDOWS'
+elif platform.system() == 'Darwin':
+    OS = 'OSX'
+elif platform.system() == 'Linux':
+    OS = 'LINUX'    # Assume a posix system
+else:
+    OS = None
 
 # Silence warnings from requests
 try:

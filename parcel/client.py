@@ -11,10 +11,10 @@ from const import HTTP_CHUNK_SIZE
 from log import get_logger
 from utils import print_download_information, write_offset, md5sum,\
     print_closing_header, print_opening_header
-
+from utils import OS
 
 # Are we running on windows?
-if os.name == 'nt':
+if OS == 'WINDOWS':
     from threading import Thread as Process
 else:
     # Assume a posix system
@@ -331,9 +331,10 @@ class Client(object):
         print('\nSUMMARY:')
         if downloaded:
             print('{}: {}'.format(
-                colored('Successfully downloaded:', 'green'), len(downloaded)))
+                colored('Successfully downloaded', 'green'), len(downloaded)))
+        if errors:
             print('{}: {}'.format(
-                colored('Failed to download:', 'red'), len(errors)))
+                colored('Failed to download', 'red'), len(errors)))
         print('')
 
     def parallel_download(self, file_id, verify=False):

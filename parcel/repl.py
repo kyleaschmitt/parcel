@@ -8,13 +8,18 @@ import shlex
 
 HEADER = """parcel - High Performance Download Client - Interactive mode
 Type 'help' for a list of commands or 'help <topic>' for detailed usage.
-You can execute shell commands by prepending '!', i.e. !ls.
-You can run parcel with advanced options from the command line (parcel --help).
+* Add files to download with 'manifest' or 'add' and start download with 'download'.
 """
 
-TIPS = """Tip: Rather than type out path names, try dragging an dropping manifest and token files into the terminal."""
+TIPS = """
+TIPS:
+- Rather than type out path names, try dragging and dropping manifest and token files into the terminal.
+- You can execute shell commands by prepending '!', i.e. !ls.
+- You can run the parcel binary with advanced options from the command line (parcel --help).
+"""
 
 BASIC_COMMANDS = """Basic commands are:
+- download   (download files in registry)
 - add        (adds ids to registry)
 - list       (lists file ids already registered)
 - manifest   (add ids from a GDC manifest file to registry)
@@ -24,7 +29,6 @@ BASIC_COMMANDS = """Basic commands are:
 - pwd        (print the current working directory)
 - set        (set advanced configuration setting)
 - settings   (list advanced configuration settings)
-- download   (download files in registry)
 """
 
 
@@ -68,9 +72,12 @@ class ParcelREPL(Cmd):
                "Start download with 'download'.  List ids with 'list'").format(
                    start_len - end_len, end_len))
 
+    def _tokenize(self, arg):
+
+
     def do_manifest(self, manifest_path):
         if not manifest_path:
-            print('No manifest specified.')
+            print('No manifest specified to load.')
             self.help_manifest()
             return
         with open(manifest_path, 'r') as fd:
@@ -82,7 +89,12 @@ class ParcelREPL(Cmd):
 
     def do_token(self, token_path):
         if not token_path:
-            print('No token specified.')
+            print('No token specified to load.')
+            if self.token:
+                print('Previously loaded token ({} bytes).'.format(
+                    len(self.token)))
+            else:
+                print('No token previously loaded')
             return
         with open(token_path, 'r') as f:
             self.token = f.read().strip()
@@ -116,6 +128,7 @@ class ParcelREPL(Cmd):
     def help_add(self):
         print("add <id1> <id2>")
         print("Register ids to register to download.")
+        print("Enter each id separated by a space.")
 
     def do_remove(self, arg):
         ids = shlex.split(arg)
@@ -127,18 +140,26 @@ class ParcelREPL(Cmd):
 
     def help_remove(self):
         print('remove:')
-        print("\tremove <id1> <id2>")
-        print("\tRegister ids to remove from registry.")
+        print("remove <id1> <id2>")
+        print("Register ids to remove from registry.")
+        print("Use 'clear' to remove all ids from registry.")
 
-    def do_reset(self, arg):
+    def do_clear(self, arg):
         self.file_ids = set()
         print('Cleared registered file ids.')
 
-    def help_reset(self):
+    def help_clear(self):
         print("\tRemove all registered ids.")
 
+    def do_clear_token(self, arg):
+        self.token = None
+        print("Cleared authorization token.")
+
+    def help_clear_token(self):
+        print("Clears the authorization token.")
+
     def do_cd(self, path):
-        os.chdir(path)
+        os.chdir(os.path.expanduser(path))
         print('Changed working directory to {}'.format(os.getcwd()))
 
     def do_pwd(self, path):
@@ -172,6 +193,7 @@ class ParcelREPL(Cmd):
                 '{} protocol not supported in interactive mode'.format(
                     self.settings['protocol']))
         downloaded, errors = client.download_files(self.file_ids)
+        self._remove_ids(downloaded)
 
     def help_download(self):
         print('Will start downloading ids registered')
@@ -190,6 +212,11 @@ class ParcelREPL(Cmd):
         print("Updating {} from '{}' to '{}'".format(
             attr, self.settings[attr], value))
         self.settings[attr] = value
+
+    def help_set(self):
+        print("set <setting> <new value>")
+        print("Change an advanced setting from default.")
+        print("Try 'settings' to see available settings.")
 
     def do_settings(self, arg):
         print('-- Settings --')

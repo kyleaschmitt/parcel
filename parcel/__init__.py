@@ -5,5 +5,4 @@ from client import Client
 from repl import ParcelREPL
 import pkg_resources
 import defaults
-
-version = '0.2.0'
+from utils import OS
