@@ -3,6 +3,8 @@ import os
 import tempfile
 import pickle
 from portability import OS_WINDOWS
+import string
+import random
 
 if OS_WINDOWS:
     WINDOWS = True
@@ -160,8 +162,35 @@ class SegmentProducer(object):
             temp.flush()
             os.fsync(temp.fileno())
             temp.close()
-            # Rename temp file as our save file
-            os.rename(temp.name, self.save_path)
+
+            # Rename temp file as our save file, this could fail if
+            # the state file and the temp directory are on different devices
+            if OS_WINDOWS and os.path.exists(self.save_path):
+                # If we're on windows, there's not much we can do here
+                # except stash the old state file, rename the new one,
+                # and back up if there is a problem.
+                old_path = os.path.join(tempfile.gettempdir(), ''.join(
+                    random.choice(string.ascii_lowercase + string.digits)
+                    for _ in range(10)))
+                try:
+                    # stash the old state file
+                    os.rename(self.save_path, old_path)
+                    # move the new state file into place
+                    os.rename(temp.name, self.save_path)
+                    # if no exception, then delete the old stash
+                    os.remove(old_path)
+                except Exception as msg:
+                    log.error('Unable to write state file: {}'.format(msg))
+                    try:
+                        os.rename(old_path, self.save_path)
+                    except:
+                        pass
+                    raise
+            else:
+                # If we're not on windows, then we'll just try to
+                # atomically rename the file
+                os.rename(temp.name, self.save_path)
+
         except KeyboardInterrupt:
             log.warn('Keyboard interrupt. removing temp save file'.format(
                 temp.name))
