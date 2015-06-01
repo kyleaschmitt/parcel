@@ -2,8 +2,9 @@ from intervaltree import Interval, IntervalTree
 import os
 import tempfile
 import pickle
+from portability import OS_WINDOWS
 
-if os.name == 'nt':
+if OS_WINDOWS:
     WINDOWS = True
     from Queue import Queue
 else:

@@ -11,10 +11,10 @@ from const import HTTP_CHUNK_SIZE, SAVE_INTERVAL
 from log import get_logger
 from utils import print_download_information, write_offset, md5sum,\
     print_closing_header, print_opening_header
-from utils import OS
+from portability import OS_WINDOWS
 
 # Are we running on windows?
-if OS == 'WINDOWS':
+if OS_WINDOWS:
     from threading import Thread as Process
 else:
     # Assume a posix system

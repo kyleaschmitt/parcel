@@ -1,19 +1,21 @@
 import platform
 from termcolor import colored as _colored
 
+OS_WINDOWS = False
+OS_LINUX = False
+OS_OSX = False
+
 # Are we running on windows?
 if platform.system() == 'Windows':
-    OS = 'WINDOWS'
+    OS_WINDOWS = True
 elif platform.system() == 'Darwin':
-    OS = 'OSX'
+    OS_OSX = True
 elif platform.system() == 'Linux':
-    OS = 'LINUX'    # Assume a posix system
-else:
-    OS = None
+    OS_LINUX = True
 
 
 def colored(text, color):
-    if OS == 'WINDOWS':
+    if OS_WINDOWS:
         return text
     else:
         return _colored(text, color)
