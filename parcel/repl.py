@@ -4,6 +4,7 @@ import manifest
 from http_client import HTTPClient
 import defaults
 import shlex
+import const
 
 
 HEADER = """parcel - High Performance Download Client - Interactive mode
@@ -46,6 +47,8 @@ class ParcelREPL(Cmd):
             server=defaults.url,
             protocol='tcp',
             processes=defaults.processes,
+            save_interval=const.SAVE_INTERVAL,
+            http_chunk_size=const.HTTP_CHUNK_SIZE,
         )
 
     def _add_ids(self, ids):
@@ -185,7 +188,10 @@ class ParcelREPL(Cmd):
                 token=self.token,
                 n_procs=int(self.settings['processes']),
                 directory=os.path.abspath(os.getcwd()),
-                uri=self.settings['server'])
+                uri=self.settings['server'],
+                http_chunk_size=int(self.settings['http_chunk_size']),
+                save_interval=int(self.settings['save_interval']),
+            )
         else:
             raise RuntimeError(
                 '{} protocol not supported in interactive mode'.format(
@@ -220,6 +226,9 @@ class ParcelREPL(Cmd):
         print('-- Settings --')
         for key, val in self.settings.iteritems():
             print('{}: {}'.format(key, val))
+
+    def do_show(self, arg):
+        self.do_settings(arg)
 
     def do_commands(self, arg):
         self.do_help(arg)

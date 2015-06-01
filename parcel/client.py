@@ -7,7 +7,7 @@ import requests
 import urlparse
 
 from segment import SegmentProducer
-from const import HTTP_CHUNK_SIZE
+from const import HTTP_CHUNK_SIZE, SAVE_INTERVAL
 from log import get_logger
 from utils import print_download_information, write_offset, md5sum,\
     print_closing_header, print_opening_header
@@ -35,7 +35,8 @@ def download_worker(client, path, file_id, producer):
 class Client(object):
 
     def __init__(self, uri, token, n_procs, directory=None,
-                 segment_md5sums=True, debug=False):
+                 segment_md5sums=True, debug=False, **kwargs):
+
         """Creates a parcel client object.
 
         :param str uri:
@@ -49,6 +50,10 @@ class Client(object):
             The directory to which any data will be downloaded
 
         """
+        self.http_chunk_size = (kwargs.get('http_chunk_size', HTTP_CHUNK_SIZE)
+                                or HTTP_CHUNK_SIZE)
+        self.save_interval = (kwargs.get('save_interval', SAVE_INTERVAL)
+                              or SAVE_INTERVAL)
         self.token = token
         self.n_procs = n_procs
         self.uri = uri if uri.endswith('/') else uri + '/'
@@ -211,7 +216,7 @@ class Client(object):
 
         # Iterate over the data stream
         log.debug('Initializing segment: {}-{}'.format(start, end))
-        for chunk in r.iter_content(chunk_size=HTTP_CHUNK_SIZE):
+        for chunk in r.iter_content(chunk_size=self.http_chunk_size):
             if not chunk:
                 continue  # Empty are keep-alives.
             offset = start + written

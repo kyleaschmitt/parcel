@@ -16,6 +16,7 @@ else:
 from log import get_logger
 from utils import get_pbar, md5sum, mmap_open, set_file_length,\
     get_file_type, STRIP
+from const import SAVE_INTERVAL
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
 log = get_logger('segment')
@@ -24,7 +25,7 @@ log = get_logger('segment')
 class SegmentProducer(object):
 
     def __init__(self, file_id, file_path, save_path, load_path, n_procs, size,
-                 save_interval=int(1e6), check_segment_md5sums=False):
+                 save_interval=SAVE_INTERVAL, check_segment_md5sums=False):
 
         self.file_id = file_id
         self.file_path = file_path
@@ -75,6 +76,7 @@ class SegmentProducer(object):
     def validate_segment_md5sums(self):
         if not self.check_segment_md5sums:
             return True
+        corrupt_segments = 0
         intervals = sorted(self.completed.items())
         pbar = ProgressBar(widgets=[
             'Checksumming {}: '.format(self.file_id), Percentage(), ' ',
@@ -91,9 +93,13 @@ class SegmentProducer(object):
                 chunk = data[interval.begin:interval.end]
                 checksum = md5sum(chunk)
                 if checksum != interval.data.get('md5sum'):
-                    log.warn('Redownloading corrupt segment {}, {}.'.format(
+                    log.debug('Redownloading corrupt segment {}, {}.'.format(
                         interval, checksum))
+                    corrupt_segments += 1
                     self.completed.remove(interval)
+        if corrupt_segments:
+            log.warn('Redownloading {} currupt segments.'.format(
+                corrupt_segments))
 
     def load_state(self, load_path, size):
         # Establish default intervals
