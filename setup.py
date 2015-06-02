@@ -53,7 +53,7 @@ if platform == 'darwin':
 
 setup(
     name='parcel',
-    version='0.1.0',
+    version='0.1.13',
     packages=["parcel"],
     cmdclass={
         'install': ParcelInstall,
