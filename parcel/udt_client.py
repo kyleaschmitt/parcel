@@ -2,6 +2,7 @@ from log import get_logger
 from client import Client
 import urlparse
 from cparcel import lib
+# import signal
 
 # Logging
 log = get_logger('client')
@@ -33,6 +34,8 @@ class UDTClient(Client):
         """Bind proxy.
 
         """
+        # Signal handling for external calls
+        # signal.signal(signal.SIGINT, signal.SIG_DFL)
 
         p = urlparse.urlparse(remote_uri)
         assert p.scheme, 'No url scheme specified'

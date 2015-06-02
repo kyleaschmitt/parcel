@@ -1,17 +1,13 @@
-#!/usr/bin/env python
+from parcel import manifest, HTTPClient, UDTClient, defaults, ParcelREPL, const
+from parcel.log import get_logger
+from parcel import colored
 import argparse
 import logging
-import os
-from parcel import manifest, HTTPClient, UDTClient
-from parcel.log import get_logger
+import sys
+
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
-
-HTTP = 'http'
-UDT = 'udt'
-TCP_DEFAULT_N_THREADS = 8
-UDT_DEFAULT_N_THREADS =8
 
 
 def get_client(args, token):
@@ -20,25 +16,29 @@ def get_client(args, token):
         n_procs=args.n_processes,
         directory=args.dir,
         segment_md5sums=args.segment_md5sums,
-        debug=args.debug
+        debug=args.debug,
+        http_chunk_size=args.http_chunk_size,
+        save_interval=args.save_interval,
     )
-    if args.mode == UDT:
+
+    if args.udt:
         return UDTClient(
             proxy_host=args.proxy_host,
             proxy_port=args.proxy_port,
-            remote_uri=args.server.pop(0),
+            remote_uri=args.server,
             external_proxy=args.external_proxy,
             **kwargs
         )
-    elif args.mode == HTTP:
+    else:
         return HTTPClient(
-            uri=args.server.pop(0),
+            uri=args.server,
             **kwargs
         )
-    raise RuntimeError('Unknown functionality.')
 
 
-def main(args):
+def run_non_interactive(parser):
+    args = parser.parse_args()
+
     # Set verbosty
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
@@ -50,38 +50,53 @@ def main(args):
     client.download_files(file_ids)
 
 
+def run_interactive(parser):
+    repl = ParcelREPL()
+    repl.prompt = colored('parcel > ', 'green')
+    repl.cmdloop()
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description=('Download files using HTTP/S over TCP or UDT.  '
+                     'Run without arguments to run interactively.'))
     parser = argparse.ArgumentParser()
-    general_parser = argparse.ArgumentParser(add_help=False)
-    subparsers = parser.add_subparsers(help='Download using UDT or HTTP',
-                                       dest='mode')
 
     #############################################################
     #                     General options
     #############################################################
 
-    general_parser.add_argument('-m', '--manifest',
-                                type=manifest.argparse_type,
-                                default=list(),
-                                help='GDC Download manifest file.')
-    general_parser.add_argument('-v', '--verbose', action='store_true',
-                                help='verbose logging')
-    general_parser.add_argument('-d', '--dir',
-                                default=os.path.abspath(os.getcwd()),
-                                help='Directory to download files to. '
-                                'Defaults to current dir')
-    general_parser.add_argument('server', metavar='server', type=str, nargs=1,
-                                help='The parcel server udt address server[:port]')
-    general_parser.add_argument('file_ids', metavar='file_id', type=str,
-                                nargs='*', help='uuids to download')
-    general_parser.add_argument('--no-segment-md5sums', dest='segment_md5sums',
-                                action='store_false',
-                                help='Calculate inbound segment md5sums and/or verify md5sums on restart')
-    general_parser.add_argument('--debug', dest='debug',
-                                action='store_true',
-                                help='Print stack traces')
+    parser.add_argument('-m', '--manifest',
+                        type=manifest.argparse_type,
+                        default=list(),
+                        help='GDC Download manifest file.')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='verbose logging')
+    parser.add_argument('-d', '--dir',
+                        default=None,
+                        help='Directory to download files to. '
+                        'Defaults to current dir')
+    parser.add_argument('-s', '--server', metavar='server', type=str,
+                        default=defaults.url,
+                        help='The parcel server udt address server[:port]')
+    parser.add_argument('file_ids', metavar='file_id', type=str,
+                        nargs='*', help='uuids to download')
+    parser.add_argument('--no-segment-md5sums', dest='segment_md5sums',
+                        action='store_false',
+                        help='Calculate inbound segment md5sums and/or verify md5sums on restart')
+    parser.add_argument('--debug', dest='debug',
+                        action='store_true',
+                        help='Print stack traces')
+    parser.add_argument('-n', '--n-processes', type=int,
+                        default=defaults.processes,
+                        help='Number of client connections.')
+    parser.add_argument('--http-chunk-size', type=int,
+                        default=const.HTTP_CHUNK_SIZE,
+                        help='Size in bytes of standard HTTP block size.')
+    parser.add_argument('--save-interval', type=int,
+                        default=const.SAVE_INTERVAL,
+                        help='The number of chunks after which to flush state file. A lower save interval will result in more frequent printout but lower performance.')
 
-    token_args = general_parser.add_mutually_exclusive_group(required=False)
+    token_args = parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file',
                             type=lambda x: argparse.FileType('r')(x).read(),
                             dest='token',
@@ -93,34 +108,26 @@ if __name__ == '__main__':
     #                       UDT options
     #############################################################
 
-    udt = subparsers.add_parser(UDT, help='Download files via UDT',
-                                parents=[general_parser])
-    udt.add_argument('-i', '--proxy-host', default='localhost', type=str,
-                     dest='proxy_host',
-                     help='The port to bind the local proxy to')
-    udt.add_argument('-p', '--proxy-port', default='9000', type=str,
-                     dest='proxy_port',
-                     help='The port to bind the local proxy to')
-    udt.add_argument('-e', '--external-proxy', action='store_true',
-                     dest='external_proxy',
-                     help='Do not create a local proxy but bind to an external one')
-    udt.add_argument('-n', '--n-processes', type=int,
-                     default=UDT_DEFAULT_N_THREADS,
-                     help='Number of udt client connections.')
+    # udt = subparsers.add_parser(UDT, help='Download files via UDT',
+    #                             parents=[parser])
 
-    #############################################################
-    #                      HTTP options
-    #############################################################
-
-    http = subparsers.add_parser(HTTP, help='Download files via HTTP',
-                                 parents=[general_parser])
-    http.add_argument('-n', '--n-processes', type=int,
-                      default=TCP_DEFAULT_N_THREADS,
-                      help='Number of tcp client connections.')
+    parser.add_argument('-u', '--udt', action='store_true',
+                        help='Use the UDT protocol.  Better for WAN connections')
+    parser.add_argument('-H', '--proxy-host', default=defaults.proxy_host,
+                        type=str, dest='proxy_host',
+                        help='The port to bind the local proxy to')
+    parser.add_argument('-P', '--proxy-port', default=defaults.proxy_port,
+                        type=str, dest='proxy_port',
+                        help='The port to bind the local proxy to')
+    parser.add_argument('-e', '--external-proxy', action='store_true',
+                        dest='external_proxy',
+                        help='Do not create a local proxy but bind to an external one')
 
     #############################################################
     #                       Start client
     #############################################################
 
-    args = parser.parse_args()
-    main(args)
+    if not sys.argv[1:]:
+        run_interactive(parser)
+    else:
+        run_non_interactive(parser)

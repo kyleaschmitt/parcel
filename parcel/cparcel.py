@@ -1,4 +1,3 @@
-import signal
 import os
 from ctypes import cdll, c_void_p, c_int
 from log import get_logger
@@ -11,10 +10,8 @@ PACKAGE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'src')
 # Load library
 try:
     _lib = cdll.LoadLibrary(os.path.join(PACKAGE_DIR, 'lparcel.so'))
-    # Signal handling for external calls
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
 except:
-    log.warn(STRIP("""
+    log.debug(STRIP("""
     Unable to load parcel udt library. Will proceed with http option only."""))
     _lib = None
 
