@@ -4,17 +4,30 @@ A high performance HTTP download client that leverages the speed of UDP without 
 
 Parcel is written on top of the UDT protocol and bound to a python interface.  Parcel's software is comprised of a *parcel-server* and a *parcel* client.
 
+## Download and run
+
+For the latest parcel app, visit the [downloads](https://github.com/LabAdvComp/parcel/releases) here.  These binaries are self-contained executables and will not install the app globally on your system.
+
+## Installing from source
+
+You can also install from source with:
+```
+❯ pip install -e 'git+https://github.com/LabAdvComp/parcel#egg=parcel'
+```
+
 ## Usage
 
-#### Using UDT
+#### Using: TCP
+
+This is the default option and can be run directly against a REST api without any additional server. Using this method, you are likely to see decreased performance over high latency networks.
+
+#### Using: UDT
 
 The client can be run in conjunction with a parcel server, or without one.  The advantage of running the client with the server (option `udt`) is the UDT proxy layer.  This prevents performance degredation of Wide Area Networks.
 
 The server is given a REST endpoint with access to data.  The client connects to the server via UDT and the data is translated to a local TCP connection. Any TCP response is then proxied back using UDT.
 
-#### Using TCP
-
-Using the `http` option is alternative to running the client against a server with the `udt` option.  It can be run directly against a REST api without any additional server. Using this method, you are likely to see decreased performance over high latency networks.
+Note: The UDT option is not currently bundled with executable binaries, you must install from source.
 
 ## Example Usage
 To use the client interactively
@@ -39,15 +52,7 @@ UDT (UDP Based Data transfer) is a reliable application level protocol for trans
 ## Dependencies
 
 - [Python 2.7+](http://python.org/)
-
-## Installation
-
-To install both the server and the client, simply run (preferrably in a python virtual environment):
-```
-❯ make
-❯ sudo make install
-❯ python setup.py install
-```
+- [Python pip](https://pypi.python.org/pypi/pip)
 
 ## Tests
 
