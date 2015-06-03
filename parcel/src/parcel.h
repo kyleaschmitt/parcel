@@ -66,7 +66,7 @@
 #define LOG
 
 /* Uncomment this line and recompile to get verbose logging output */
-#define DEBUG
+/* #define DEBUG */
 
 /******************************************************************************/
 using namespace std;
