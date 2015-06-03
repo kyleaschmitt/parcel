@@ -201,6 +201,8 @@ int connect_remote_udt(transcriber_args_t *args)
     UDT::setsockopt(udt_socket, 0, UDT_MSS, &mss, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDT_SNDBUF, &udt_buff, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDP_SNDBUF, &udp_buff, sizeof(int));
+    UDT::setsockopt(udt_socket, 0, UDT_RCVBUF, &udt_buff, sizeof(int));
+    UDT::setsockopt(udt_socket, 0, UDP_RCVBUF, &udp_buff, sizeof(int));
 
     /* Get address information */
     if (0 != getaddrinfo(args->remote_host, args->remote_port, &hints, &peer)){
