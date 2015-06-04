@@ -176,6 +176,8 @@ class ParcelREPL(Cmd):
     def do_download(self, arg, opts=None):
         manifest_path = opts.get('manifest')
         token_path = opts.get('token')
+        if arg:
+            self.do_add(arg)
         if manifest_path:
             self.do_manifest(manifest_path)
         if token_path:
