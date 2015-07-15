@@ -75,6 +75,8 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
     UDT::setsockopt(udt_socket, 0, UDT_MSS, &mss, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDT_SNDBUF, &udt_buffer_size, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDP_SNDBUF, &udp_buffer_size, sizeof(int));
+    UDT::setsockopt(udt_socket, 0, UDT_RCVBUF, &udt_buffer_size, sizeof(int));
+    UDT::setsockopt(udt_socket, 0, UDP_RCVBUF, &udp_buffer_size, sizeof(int));
     UDT::setsockopt(udt_socket, 0, UDT_REUSEADDR, &reuseaddr, sizeof(int));
 
     /* Bind the server socket */
@@ -276,7 +278,7 @@ void *thread_udt2tcp(void *_args_)
     tcp_pipe_args_t *pipe2tcp_args = (tcp_pipe_args_t*)malloc(sizeof(tcp_pipe_args_t));
     pipe2tcp_args->tcp_socket = args->tcp_socket;
     pipe2tcp_args->pipe = cbuffer;
-    debug("Calling pipe2tcp thread");
+    debug("Calling pipe2tcp");
     pipe2tcp(pipe2tcp_args);  // There is no reason not to block on this now
 
     /* Join transcriber thread */
