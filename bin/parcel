@@ -1,16 +1,24 @@
-from parcel import manifest, HTTPClient, UDTClient, defaults, ParcelREPL, const
+#!/usr/bin/env python
+
+from parcel import (
+    HTTPClient,
+    ParcelREPL,
+    UDTClient,
+    colored,
+    const,
+    defaults,
+    manifest)
 from parcel.log import get_logger
-from parcel import colored
+
 import argparse
 import logging
 import sys
-
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
 
 
-def get_client(args, token):
+def get_client(args, token, **_kwargs):
     kwargs = dict(
         token=token,
         n_procs=args.n_processes,
@@ -19,6 +27,7 @@ def get_client(args, token):
         debug=args.debug,
         http_chunk_size=args.http_chunk_size,
         save_interval=args.save_interval,
+        download_related_files=True if not args.no_related_files else False,
     )
 
     if args.udt:
@@ -38,15 +47,13 @@ def get_client(args, token):
 
 def run_non_interactive(parser):
     args = parser.parse_args()
+    client = get_client(args, args.token)
 
-    # Set verbosty
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
-    # Create client
-    client = get_client(args, args.token)
+
     # Create file list and remove duplicates
     file_ids = set([f['id'] for f in args.manifest] + args.file_ids)
-    # Download files
     client.download_files(file_ids)
 
 
@@ -95,6 +102,8 @@ if __name__ == '__main__':
     parser.add_argument('--save-interval', type=int,
                         default=const.SAVE_INTERVAL,
                         help='The number of chunks after which to flush state file. A lower save interval will result in more frequent printout but lower performance.')
+    parser.add_argument('--no-related-files', action='store_true',
+                        help='Tell parcel (not) to download related files.')
 
     token_args = parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file',

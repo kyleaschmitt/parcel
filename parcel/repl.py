@@ -176,6 +176,9 @@ class ParcelREPL(Cmd):
     def do_download(self, arg, opts=None):
         manifest_path = opts.get('manifest')
         token_path = opts.get('token')
+
+        if arg:
+            self._add_ids(arg.split())
         if manifest_path:
             self.do_manifest(manifest_path)
         if token_path:
@@ -183,6 +186,7 @@ class ParcelREPL(Cmd):
         if not self.file_ids:
             self.do_list(None)
             return
+
         if self.settings['protocol'] == 'tcp':
             client = HTTPClient(
                 token=self.token,
@@ -192,10 +196,12 @@ class ParcelREPL(Cmd):
                 http_chunk_size=int(self.settings['http_chunk_size']),
                 save_interval=int(self.settings['save_interval']),
             )
+
         else:
             raise RuntimeError(
-                '{} protocol not supported in interactive mode'.format(
-                    self.settings['protocol']))
+                ("{} protocol not supported in interactive mode.  "
+                 "Try 'parcel --help'").format(self.settings['protocol']))
+
         downloaded, errors = client.download_files(self.file_ids)
         self._remove_ids(downloaded)
 

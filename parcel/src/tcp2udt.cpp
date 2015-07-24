@@ -1,15 +1,7 @@
 /******************************************************************************
  *
  * FILE    : tcp2udt.cpp
- * AUTHOR  : Joshua Miller
- *           jshuasmiller@gmail.com              _
- * PROJECT : parcel                             | |
- *                      _ __   __ _ _ __ ___ ___| |
- *                     | '_ \ / _` | '__/ __/ _ \ |
- *                     | |_) | (_| | | | (_|  __/ |
- *                     | .__/ \__,_|_|  \___\___|_|
- *                     | |
- *                     |_|
+ * PROJECT : parcel
  *
  * DESCRIPTION : This file contains functions for creating a TCP
  *               server that accpts incomming connections, creates a
