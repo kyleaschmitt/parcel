@@ -1,14 +1,12 @@
-from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
-from stat import S_ISDIR, S_ISCHR, S_ISBLK, S_ISREG, S_ISFIFO, \
-    S_ISLNK, S_ISSOCK
+from .log import get_logger
 
-import os
-from const import GB
-from log import get_logger
-import requests
+from contextlib import contextmanager
+from progressbar import ProgressBar, Percentage, Bar, ETA, FileTransferSpeed
 import hashlib
 import mmap
-from contextlib import contextmanager
+import os
+import requests
+import stat
 
 # Logging
 log = get_logger('utils')
@@ -18,6 +16,22 @@ try:
     requests.packages.urllib3.disable_warnings()
 except Exception as e:
     log.info('Unable to silence requests warnings: {}'.format(str(e)))
+
+
+def check_transfer_size(actual, expected):
+    """Simple validation on any expected versus actual sizes.
+
+    :param int actual: The size that was actually transferred
+    :param int actual: The size that was expected to be transferred
+
+    """
+
+    if actual != expected:
+        log.debug(
+            'Transfer size incorrect: {} != {} expected'.format(
+                actual, expected))
+        return False
+    return True
 
 
 def get_pbar(file_id, maxval, start_val=0):
@@ -46,14 +60,6 @@ def print_opening_header(file_id):
 def print_closing_header(file_id):
     log.info('^{}^'.format('{s:{c}^{n}}'.format(
         s=' {} '.format(file_id), n=50, c='-')))
-
-
-def print_download_information(file_id, size, name, path):
-    log.info('Starting download   : {}'.format(file_id))
-    log.info('File name           : {}'.format(name))
-    log.info('Download size       : {} B ({:.2f} GB)'.format(
-        size, (size / float(GB))))
-    log.info('Downloading file to : {}'.format(path))
 
 
 def write_offset(path, data, offset):
@@ -93,19 +99,19 @@ def set_file_length(path, length):
 def get_file_type(path):
     try:
         mode = os.stat(path).st_mode
-        if S_ISDIR(mode):
+        if stat.S_ISDIR(mode):
             return 'directory'
-        elif S_ISCHR(mode):
+        elif stat.S_ISCHR(mode):
             return 'character device'
-        elif S_ISBLK(mode):
+        elif stat.S_ISBLK(mode):
             return 'block device'
-        elif S_ISREG(mode):
+        elif stat.S_ISREG(mode):
             return 'regular'
-        elif S_ISFIFO(mode):
+        elif stat.S_ISFIFO(mode):
             return 'fifo'
-        elif S_ISLNK(mode):
+        elif stat.S_ISLNK(mode):
             return 'link'
-        elif S_ISSOCK(mode):
+        elif stat.S_ISSOCK(mode):
             return 'socket'
         else:
             return 'unknown'

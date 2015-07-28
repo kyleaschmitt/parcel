@@ -13,6 +13,13 @@ elif platform.system() == 'Darwin':
 elif platform.system() == 'Linux':
     OS_LINUX = True
 
+# Are we running on windows?
+if OS_WINDOWS:
+    from threading import Thread as Process
+else:
+    # Assume a posix system
+    from multiprocessing import Process
+
 
 def colored(text, color):
     if OS_WINDOWS:
