@@ -12,6 +12,8 @@ class UDTClient(Client):
 
     def __init__(self, proxy_host, proxy_port, remote_uri,
                  external_proxy=False, *args, **kwargs):
+        if not remote_uri.startswith('http'):
+            remote_uri = 'https://{}'.format(remote_uri)
         if not external_proxy:
             # Create a local UDT proxy that translates TCP to UDT
             self.start_proxy_server(proxy_host, proxy_port, remote_uri)

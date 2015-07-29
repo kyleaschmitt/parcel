@@ -31,16 +31,18 @@ def get_client(args, token, **_kwargs):
     )
 
     if args.udt:
+        server = args.server or defaults.udt_url
         return UDTClient(
             proxy_host=args.proxy_host,
             proxy_port=args.proxy_port,
-            remote_uri=args.server,
+            remote_uri=server,
             external_proxy=args.external_proxy,
             **kwargs
         )
     else:
+        server = args.server or defaults.tcp_url
         return HTTPClient(
-            uri=args.server,
+            uri=server,
             **kwargs
         )
 
@@ -83,7 +85,7 @@ if __name__ == '__main__':
                         help='Directory to download files to. '
                         'Defaults to current dir')
     parser.add_argument('-s', '--server', metavar='server', type=str,
-                        default=defaults.url,
+                        default=None,
                         help='The parcel server udt address server[:port]')
     parser.add_argument('file_ids', metavar='file_id', type=str,
                         nargs='*', help='uuids to download')
