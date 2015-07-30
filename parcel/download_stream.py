@@ -118,11 +118,12 @@ class DownloadStream(object):
         s.mount(urlparse.urlparse(url).scheme, a)
 
         headers = self.headers() if headers is None else headers
-        r = s.get(url, headers=headers, verify=verify, stream=True)
         try:
+            r = s.get(url, headers=headers, verify=verify, stream=True)
             r.raise_for_status()
         except Exception as e:
-            raise RuntimeError('{}: {}'.format(str(e), r.text))
+            raise RuntimeError(
+                'Unable to connect to API: {}: {}'.format(str(e), r.text))
         if close:
             r.close()
         return r
@@ -148,7 +149,7 @@ class DownloadStream(object):
                      if attachment else 'untitled')
         return self.name, self.size
 
-    def write_segment(self, segment, q_complete):
+    def write_segment(self, segment, q_complete, retries=5):
 
         """Read data from the data server and write it to a file.
 
@@ -168,7 +169,17 @@ class DownloadStream(object):
         # the interval.
         start, end = segment.begin, segment.end-1
         assert end >= start, 'Invalid segment range.'
-        r = self.request(self.header(start, end))
+        try:
+            r = self.request(self.header(start, end))
+        except Exception as e:
+            self.log.warn(
+                'Unable to download part of file: {}\n.'.format(str(e)))
+            if retries > 0:
+                self.log.warn('Retrying download of this segment')
+                self.write_segment(segment, q_complete, retries-1)
+            else:
+                self.log.error('Max retries exceeded.')
+                return 0
 
         # Iterate over the data stream
         self.log.debug('Initializing segment: {}-{}'.format(start, end))

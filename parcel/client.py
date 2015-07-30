@@ -211,6 +211,7 @@ class Client(object):
 
         # File informaion
         utils.print_opening_header(file_id)
+        log.info('Getting file information...')
         directory = (os.path.join(self.directory, file_id)
                      if directory is None else directory)
         download = DownloadStream(file_id, self.uri, directory, self.token)
