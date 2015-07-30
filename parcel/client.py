@@ -181,7 +181,6 @@ class Client(object):
         try:
             r = requests.get(url, verify=False)
             r.raise_for_status()
-            print r.json()
             annotations = [a['annotation_id'] for a in
                            r.json()['data'].get('annotations', [])]
         except Exception as e:
