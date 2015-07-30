@@ -42,6 +42,8 @@ class Client(object):
             'save_interval', const.SAVE_INTERVAL)
         self.related_files = kwargs.get(
             'download_related_files', True)
+        self.annotations = kwargs.get(
+            'download_annotations', True)
 
         self.debug = debug
         self.directory = directory or os.path.abspath(os.getcwd())
@@ -101,7 +103,7 @@ class Client(object):
         for file_id in set(file_ids):
             try:
                 self.parallel_download(
-                    file_id, download_related_files=self.related_files,
+                    file_id,
                     *args, **kwargs)
                 downloaded.append(file_id)
             except Exception as e:
@@ -131,6 +133,12 @@ class Client(object):
         print('')
 
     def get_related_files(self, file_id):
+        """Query the GDC api for related files.
+
+        :params str file_id: String containing the id of the primary entity
+        :returns: A list of related file ids
+
+        """
         url = '{}/files/{}?fields=related_files.file_id'.format(
             self.uri.replace('/data/', ''), file_id)
         try:
@@ -147,12 +155,54 @@ class Client(object):
         return related_files
 
     def download_related_files(self, file_id, directory):
+        """Finds and downloads files related tol the primary entity.
+
+        :param str file_id: String containing the id of the primary entity
+        :param str directory: The primary entity's directory
+
+        """
         for related_file in self.get_related_files(file_id):
             self.parallel_download(
-                related_file, directory, download_related_files=False)
+                related_file,
+                directory,
+                download_related_files=False,
+                download_annotations=False,
+            )
+
+    def get_annotations(self, file_id):
+        """Query the GDC api for annotations and download them to a file.
+
+        :params str file_id: String containing the id of the primary entity
+        :returns: A list of related file ids
+
+        """
+        url = '{}/files/{}?fields=annotations.annotation_id'.format(
+            self.uri.replace('/data/', ''), file_id)
+        try:
+            r = requests.get(url, verify=False)
+            r.raise_for_status()
+            print r.json()
+            annotations = [a['annotation_id'] for a in
+                           r.json()['data'].get('annotations', [])]
+        except Exception as e:
+            log.warn('Unable to get related files for {}: {}'.format(
+                file_id, e))
+            annotations = []
+        return annotations
+
+    def download_annotations(self, file_id, directory):
+        annotations = self.get_annotations(file_id)
+        if annotations:
+            self.parallel_download(
+                ','.join(annotations),
+                directory,
+                download_related_files=False,
+                download_annotations=False,
+            )
 
     def parallel_download(self, file_id, directory=None,
-                          download_related_files=True):
+                          download_related_files=None,
+                          download_annotations=None):
         """Start ``self.n_procs`` to download the file.
 
         :params str file_id:
@@ -189,5 +239,12 @@ class Client(object):
         producer.wait_for_completion()
         self.stop_timer()
 
-        if download_related_files:
+        # Recurse on related files
+        if download_related_files or (
+                download_related_files is None and self.related_files):
             self.download_related_files(file_id, directory)
+
+        # Recurse on annotations
+        if download_annotations or (
+                download_annotations is None and self.annotations):
+            self.download_annotations(file_id, directory)
