@@ -62,7 +62,7 @@ def run_non_interactive(parser):
 
 def run_interactive(parser):
     repl = ParcelREPL()
-    repl.prompt = colored('parcel > ', 'green')
+    repl.prompt = 'parcel > '
     repl.cmdloop()
 
 if __name__ == '__main__':
