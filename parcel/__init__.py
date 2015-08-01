@@ -6,3 +6,4 @@ from repl import ParcelREPL
 import pkg_resources
 import defaults
 from portability import colored
+from version import __version__, version_string

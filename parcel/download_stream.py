@@ -176,7 +176,7 @@ class DownloadStream(object):
                 'Unable to download part of file: {}\n.'.format(str(e)))
             if retries > 0:
                 self.log.warn('Retrying download of this segment')
-                self.write_segment(segment, q_complete, retries-1)
+                return self.write_segment(segment, q_complete, retries-1)
             else:
                 self.log.error('Max retries exceeded.')
                 return 0

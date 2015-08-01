@@ -1,16 +1,19 @@
+from . import const
+from . import defaults
+from . import manifest
+from .version import version_string
 from cmd2 import Cmd, options, make_option
-import os
-import manifest
 from http_client import HTTPClient
-import defaults
+import os
 import shlex
-import const
 
 
-HEADER = """parcel - High Performance Download Client - Interactive mode
+HEADER = """{version}
+High Performance Download Client - Interactive mode
+
 Type 'help' for a list of commands or 'help <topic>' for detailed usage.
 * Add files to download with 'manifest' or 'add' and start download with 'download'.
-"""
+""".format(version=version_string)
 
 TIPS = """
 TIPS:

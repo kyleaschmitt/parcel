@@ -10,7 +10,6 @@ import requests
 import os
 import time
 
-
 # Logging
 log = get_logger('client')
 
