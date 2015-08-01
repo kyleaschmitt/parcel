@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Get version
+VERSION=$(git branch 2>/dev/null | grep '*' | sed s/'* '//g | cut -d'-' -f2)
+
+# Create binary
+pyinstaller --clean --noconfirm --onefile -c  parcel
+
+# Bundle app
 APPNAME="Parcel"
 
 BUNDLE="dist/${APPNAME}.app"
@@ -11,9 +18,10 @@ RESOURCES="${CONTENTS}/Resources"
 WRAPPER="${MacOS}/${APPNAME}"
 
 if [ -a "${BUNDLE}" ]; then
-    echo "${BUNDLE} already exists"
-    exit 1
+    rm -rf "${BUNDLE}"
 fi
+
+echo "Bundling to ${BUNDLE}"
 
 # Create bundle
 mkdir -p "${MacOS}"
@@ -43,3 +51,6 @@ echo '
 </dict>
 </plist>
 ' > "${CONTENTS}/Info.plist"
+
+# Zip dist
+zip "parcel_${VERSION}_OSX_x64.zip" "${BUNDLE}" "${SOURCE}"
