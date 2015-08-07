@@ -120,10 +120,12 @@ class DownloadStream(object):
         headers = self.headers() if headers is None else headers
         try:
             r = s.get(url, headers=headers, verify=verify, stream=True)
-            r.raise_for_status()
         except Exception as e:
-            raise RuntimeError(
-                'Unable to connect to API: {}: {}'.format(str(e), r.text))
+            raise RuntimeError((
+                "Unable to connect to API: ({}). Is this url correct: '{}'? "
+                "Is there a connection to the API? Is the server running?"
+            ).format(str(e), self.uri))
+        r.raise_for_status()
         if close:
             r.close()
         return r
@@ -143,7 +145,7 @@ class DownloadStream(object):
             raise ValueError(
                 'Unexpected response from server: missing content length.')
         self.size = long(content_length)
-        self.log.info('Request responded: {} bytes'.format(self.size))
+        self.log.info('Request responded   : {} bytes'.format(self.size))
         attachment = r.headers.get('content-disposition', None)
         self.name = (attachment.split('filename=')[-1]
                      if attachment else 'untitled')
