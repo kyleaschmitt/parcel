@@ -169,10 +169,16 @@ class Client(object):
 
         def download_worker():
             while True:
-                segment = producer.q_work.get()
-                if segment is None:
-                    return log.debug('Producer returned with no more work')
-                stream.write_segment(segment, producer.q_complete)
+                try:
+                    segment = producer.q_work.get()
+                    if segment is None:
+                        return log.debug('Producer returned with no more work')
+                    stream.write_segment(segment, producer.q_complete)
+                except Exception as e:
+                    if self.debug:
+                        raise
+                    else:
+                        log.error("Download aborted: {}".format(str(e)))
 
         # Divide work amongst process pool
         pool = [Process(target=download_worker) for i in range(n_procs)]

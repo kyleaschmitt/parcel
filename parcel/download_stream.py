@@ -171,8 +171,34 @@ class DownloadStream(object):
         # the interval.
         start, end = segment.begin, segment.end-1
         assert end >= start, 'Invalid segment range.'
+
         try:
+            # Initialize segment request
             r = self.request(self.header(start, end))
+
+            # Iterate over the data stream
+            self.log.debug('Initializing segment: {}-{}'.format(start, end))
+            for chunk in r.iter_content(chunk_size=self.http_chunk_size):
+                if not chunk:
+                    continue  # Empty are keep-alives.
+                offset = start + written
+                written += len(chunk)
+
+                # Write the chunk to disk, create an interval that
+                # represents the chunk, get md5 info if necessary, and
+                # report completion back to the producer
+                utils.write_offset(self.path, chunk, offset)
+                if self.check_segment_md5sums:
+                    iv_data = {'md5sum': utils.md5sum(chunk)}
+                else:
+                    iv_data = None
+                complete_segment = Interval(offset, offset+len(chunk), iv_data)
+                q_complete.put(complete_segment)
+
+        except KeyboardInterrupt:
+            return self.log.error('Process stopped by user.')
+
+        # Retry on exception if we haven't exceeded max retries
         except Exception as e:
             self.log.warn(
                 'Unable to download part of file: {}\n.'.format(str(e)))
@@ -183,27 +209,14 @@ class DownloadStream(object):
                 self.log.error('Max retries exceeded.')
                 return 0
 
-        # Iterate over the data stream
-        self.log.debug('Initializing segment: {}-{}'.format(start, end))
-        for chunk in r.iter_content(chunk_size=self.http_chunk_size):
-            if not chunk:
-                continue  # Empty are keep-alives.
-            offset = start + written
-            written += len(chunk)
-
-            # Write the chunk to disk, create an interval that
-            # represents the chunk, get md5 info if necessary, and
-            # report completion back to the producer
-            utils.write_offset(self.path, chunk, offset)
-            if self.check_segment_md5sums:
-                iv_data = {'md5sum': utils.md5sum(chunk)}
+        # Check that the data is not truncated or elongated
+        if written != segment.end-segment.begin:
+            self.log.warn('Segment corruption: {}'.format(
+                '(non-fatal) retrying' if retries else 'max retries exceeded'))
+            if retries:
+                return self.write_segment(segment, q_complete, retries-1)
             else:
-                iv_data = None
-            segment = Interval(offset, offset+len(chunk), iv_data)
-            q_complete.put(segment)
-
-        if not utils.check_transfer_size(written, segment.end-segment.begin):
-            return self.write_segment(segment, q_complete)
+                raise RuntimeError('Segment corruption. Max retries exceeded.')
 
         r.close()
         return written
