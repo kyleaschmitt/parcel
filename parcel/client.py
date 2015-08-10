@@ -7,6 +7,7 @@ from .portability import Process
 from .segment import SegmentProducer
 
 import os
+import tempfile
 import time
 
 # Logging
@@ -40,6 +41,7 @@ class Client(object):
 
         self.debug = debug
         self.directory = directory or os.path.abspath(os.getcwd())
+        self.directory = os.path.expanduser(self.directory)
         self.n_procs = n_procs
         self.start = None
         self.stop = None
@@ -58,6 +60,21 @@ class Client(object):
         if not (uri.startswith('https://') or uri.startswith('http://')):
             uri = 'https://{}'.format(uri)
         return uri
+
+    @staticmethod
+    def raise_for_write_permissions(directory):
+        try:
+            tempfile.NamedTemporaryFile(dir=directory).close()
+        except (OSError, IOError) as e:
+            raise IOError(utils.STRIP("""Unable to write
+            to download to directory '{directory}': {err}.  This
+            error likely occurred because the program was launched
+            from (or specified to download to) a protected
+            directory.  If you are running this executable from an
+            archive (*.zip, *.tar.gz, etc.) then extracting it
+            from the archive might solve this problem. Otherwise,
+            please see documentation on how to change/specify
+            directory.""").format(err=str(e), directory=directory))
 
     def start_timer(self):
         """Start a download timer.
@@ -93,6 +110,8 @@ class Client(object):
         if not file_ids:
             log.warn('No file ids given.')
             return
+
+        self.raise_for_write_permissions(self.directory)
 
         # Log file ids
         for file_id in file_ids:
