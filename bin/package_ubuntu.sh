@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+# Make sure the correct version of pyinstall is installed
+pip install 'PyInstaller==2.1'
+
 # Get version
-VERSION=$(git branch 2>/dev/null | grep '*' | sed s/'* '//g | cut -d'-' -f2)
+VERSION=$(python -c 'import parcel; print parcel.__version__')
 
 # Create binary
 pyinstaller --clean --noconfirm --onefile -c parcel
