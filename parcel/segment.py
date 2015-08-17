@@ -5,6 +5,7 @@ import pickle
 import random
 import string
 import tempfile
+import time
 
 if OS_WINDOWS:
     WINDOWS = True
@@ -233,8 +234,20 @@ class SegmentProducer(object):
                 self.check_file_exists_and_size())
 
     def finish_download(self):
+        # Tell the children there is no more work, each child should
+        # pull one NoneType from the queue and exit
         for i in range(self.n_procs):
             self.q_work.put(None)
+
+        # Wait for all the children to exit by checking to make sure
+        # that everyone has taken their NoneType from the queue.
+        # Otherwise, the segment producer will exit before the
+        # children return, causing them to read from a closed queue
+        log.debug('Waiting for children to report')
+        while not self.q_work.empty():
+            time.sleep(0.1)
+
+        # Finish the progressbar
         if self.pbar:
             self.pbar.finish()
 

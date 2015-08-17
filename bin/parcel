@@ -1,18 +1,15 @@
 #!/usr/bin/env python
-
 from parcel import (
     HTTPClient,
-    ParcelREPL,
     UDTClient,
-    colored,
     const,
     defaults,
-    manifest)
+    manifest,
+    version_string)
 from parcel.log import get_logger
 
 import argparse
 import logging
-import sys
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
@@ -27,8 +24,6 @@ def get_client(args, token, **_kwargs):
         debug=args.debug,
         http_chunk_size=args.http_chunk_size,
         save_interval=args.save_interval,
-        download_related_files=True if not args.no_related_files else False,
-        download_annotatons=True if not args.no_annotations else False,
     )
 
     if args.udt:
@@ -50,6 +45,10 @@ def get_client(args, token, **_kwargs):
 
 def run_non_interactive(parser):
     args = parser.parse_args()
+    if args.version:
+        print(version_string)
+        return
+
     client = get_client(args, args.token)
 
     if args.verbose:
@@ -57,13 +56,8 @@ def run_non_interactive(parser):
 
     # Create file list and remove duplicates
     file_ids = set([f['id'] for f in args.manifest] + args.file_ids)
+    log.info(version_string.replace('\n', ' - '))
     client.download_files(file_ids)
-
-
-def run_interactive(parser):
-    repl = ParcelREPL()
-    repl.prompt = colored('parcel > ', 'green')
-    repl.cmdloop()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -74,7 +68,7 @@ if __name__ == '__main__':
     #############################################################
     #                     General options
     #############################################################
-
+    parser.add_argument('--version', action='store_true')
     parser.add_argument('-m', '--manifest',
                         type=manifest.argparse_type,
                         default=list(),
@@ -105,10 +99,6 @@ if __name__ == '__main__':
     parser.add_argument('--save-interval', type=int,
                         default=const.SAVE_INTERVAL,
                         help='The number of chunks after which to flush state file. A lower save interval will result in more frequent printout but lower performance.')
-    parser.add_argument('--no-related-files', action='store_true',
-                        help='Tell parcel not to download related files.')
-    parser.add_argument('--no-annotations', action='store_true',
-                        help='Tell parcel not to download annotations.')
 
     token_args = parser.add_mutually_exclusive_group(required=False)
     token_args.add_argument('-t', '--token-file',
@@ -141,7 +131,4 @@ if __name__ == '__main__':
     #                       Start client
     #############################################################
 
-    if not sys.argv[1:]:
-        run_interactive(parser)
-    else:
-        run_non_interactive(parser)
+    run_non_interactive(parser)

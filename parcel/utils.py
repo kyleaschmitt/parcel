@@ -26,12 +26,7 @@ def check_transfer_size(actual, expected):
 
     """
 
-    if actual != expected:
-        log.debug(
-            'Transfer size incorrect: {} != {} expected'.format(
-                actual, expected))
-        return False
-    return True
+    return actual == expected
 
 
 def get_pbar(file_id, maxval, start_val=0):

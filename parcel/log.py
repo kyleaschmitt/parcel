@@ -19,7 +19,8 @@ def get_logger(name='parcel'):
         formatter = logging.Formatter(
             colored('%(asctime)s: %(levelname)s: ', 'blue')+'%(message)s')
     else:
-        formatter = logging.Formatter('%(asctime)s: %(levelname)s: %(message)s')
+        formatter = logging.Formatter(
+            '%(asctime)s: %(levelname)s: %(message)s')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     log.addHandler(handler)

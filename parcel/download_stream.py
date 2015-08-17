@@ -118,11 +118,14 @@ class DownloadStream(object):
         s.mount(urlparse.urlparse(url).scheme, a)
 
         headers = self.headers() if headers is None else headers
-        r = s.get(url, headers=headers, verify=verify, stream=True)
         try:
-            r.raise_for_status()
+            r = s.get(url, headers=headers, verify=verify, stream=True)
         except Exception as e:
-            raise RuntimeError('{}: {}'.format(str(e), r.text))
+            raise RuntimeError((
+                "Unable to connect to API: ({}). Is this url correct: '{}'? "
+                "Is there a connection to the API? Is the server running?"
+            ).format(str(e), self.uri))
+        r.raise_for_status()
         if close:
             r.close()
         return r
@@ -142,13 +145,13 @@ class DownloadStream(object):
             raise ValueError(
                 'Unexpected response from server: missing content length.')
         self.size = long(content_length)
-        self.log.info('Request responded: {} bytes'.format(self.size))
+        self.log.info('Request responded   : {} bytes'.format(self.size))
         attachment = r.headers.get('content-disposition', None)
         self.name = (attachment.split('filename=')[-1]
                      if attachment else 'untitled')
         return self.name, self.size
 
-    def write_segment(self, segment, q_complete):
+    def write_segment(self, segment, q_complete, retries=5):
 
         """Read data from the data server and write it to a file.
 
@@ -168,29 +171,52 @@ class DownloadStream(object):
         # the interval.
         start, end = segment.begin, segment.end-1
         assert end >= start, 'Invalid segment range.'
-        r = self.request(self.header(start, end))
 
-        # Iterate over the data stream
-        self.log.debug('Initializing segment: {}-{}'.format(start, end))
-        for chunk in r.iter_content(chunk_size=self.http_chunk_size):
-            if not chunk:
-                continue  # Empty are keep-alives.
-            offset = start + written
-            written += len(chunk)
+        try:
+            # Initialize segment request
+            r = self.request(self.header(start, end))
 
-            # Write the chunk to disk, create an interval that
-            # represents the chunk, get md5 info if necessary, and
-            # report completion back to the producer
-            utils.write_offset(self.path, chunk, offset)
-            if self.check_segment_md5sums:
-                iv_data = {'md5sum': utils.md5sum(chunk)}
+            # Iterate over the data stream
+            self.log.debug('Initializing segment: {}-{}'.format(start, end))
+            for chunk in r.iter_content(chunk_size=self.http_chunk_size):
+                if not chunk:
+                    continue  # Empty are keep-alives.
+                offset = start + written
+                written += len(chunk)
+
+                # Write the chunk to disk, create an interval that
+                # represents the chunk, get md5 info if necessary, and
+                # report completion back to the producer
+                utils.write_offset(self.path, chunk, offset)
+                if self.check_segment_md5sums:
+                    iv_data = {'md5sum': utils.md5sum(chunk)}
+                else:
+                    iv_data = None
+                complete_segment = Interval(offset, offset+len(chunk), iv_data)
+                q_complete.put(complete_segment)
+
+        except KeyboardInterrupt:
+            return self.log.error('Process stopped by user.')
+
+        # Retry on exception if we haven't exceeded max retries
+        except Exception as e:
+            self.log.warn(
+                'Unable to download part of file: {}\n.'.format(str(e)))
+            if retries > 0:
+                self.log.warn('Retrying download of this segment')
+                return self.write_segment(segment, q_complete, retries-1)
             else:
-                iv_data = None
-            segment = Interval(offset, offset+len(chunk), iv_data)
-            q_complete.put(segment)
+                self.log.error('Max retries exceeded.')
+                return 0
 
-        if not utils.check_transfer_size(written, segment.end-segment.begin):
-            return self.write_segment(segment, q_complete)
+        # Check that the data is not truncated or elongated
+        if written != segment.end-segment.begin:
+            self.log.warn('Segment corruption: {}'.format(
+                '(non-fatal) retrying' if retries else 'max retries exceeded'))
+            if retries:
+                return self.write_segment(segment, q_complete, retries-1)
+            else:
+                raise RuntimeError('Segment corruption. Max retries exceeded.')
 
         r.close()
         return written
