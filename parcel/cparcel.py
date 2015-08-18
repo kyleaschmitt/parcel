@@ -1,15 +1,19 @@
-import os
 from ctypes import cdll, c_void_p, c_int
 from log import get_logger
 from utils import STRIP
+import tempfile
+import pkgutil
 
 # Logging
 log = get_logger('client')
-PACKAGE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'src')
+
 
 # Load library
 try:
-    _lib = cdll.LoadLibrary(os.path.join(PACKAGE_DIR, 'lparcel.so'))
+    dll_data = pkgutil.get_data('parcel', 'src/lparcel.so')
+    dll_file = tempfile.NamedTemporaryFile()
+    dll_file.write(dll_data)
+    _lib = cdll.LoadLibrary(dll_file.name)
 except:
     log.debug(STRIP("""
     Unable to load parcel udt library. Will proceed with http option only."""))
@@ -19,9 +23,9 @@ except:
 def no_parcel_lib(*args, **kwargs):
     raise NotImplementedError(STRIP("""
         C++ parcel dynamic library failed to load. Either it was not
-        installed to the package directory at '{}', or the parcel udt command is
+        installed to the package directory, or the parcel udt command is
         currently not compatible with your machine.
-        """.format(PACKAGE_DIR)))
+        """))
 
 
 class ParcelDLL(object):
