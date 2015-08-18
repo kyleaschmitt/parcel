@@ -58,6 +58,7 @@ setup(
     cmdclass={
         'install': ParcelInstall,
         'develop': ParcelDevelop,
+        'bdist_egg': ParcelDevelop,
     },
     install_requires=[
         'requests==2.5.1',
