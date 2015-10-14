@@ -51,8 +51,7 @@ class TestParcelHTTP(unittest.TestCase):
                  file_id])
             self.validate_file(
                 os.path.join(gettempdir(), file_id),
-                os.path.join(gettempdir(), self.dest_dir, '{}_{}'.format(
-                    file_id, file_id)))
+                os.path.join(gettempdir(), self.dest_dir, file_id, file_id))
 
     def test_parallel(self):
         for file_id in self.file_ids:
@@ -65,5 +64,4 @@ class TestParcelHTTP(unittest.TestCase):
                  file_id])
             self.validate_file(
                 os.path.join(gettempdir(), file_id),
-                os.path.join(gettempdir(), self.dest_dir, '{}_{}'.format(
-                    file_id, file_id)))
+                os.path.join(gettempdir(), self.dest_dir, file_id, file_id))

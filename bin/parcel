@@ -1,16 +1,21 @@
-from parcel import manifest, HTTPClient, UDTClient, defaults, ParcelREPL, const
+#!/usr/bin/env python
+from parcel import (
+    HTTPClient,
+    UDTClient,
+    const,
+    defaults,
+    manifest,
+    version_string)
 from parcel.log import get_logger
-from parcel import colored
+
 import argparse
 import logging
-import sys
-
 
 logging.root.setLevel(logging.INFO)
 log = get_logger('parcel_client')
 
 
-def get_client(args, token):
+def get_client(args, token, **_kwargs):
     kwargs = dict(
         token=token,
         n_procs=args.n_processes,
@@ -22,38 +27,37 @@ def get_client(args, token):
     )
 
     if args.udt:
+        server = args.server or defaults.udt_url
         return UDTClient(
             proxy_host=args.proxy_host,
             proxy_port=args.proxy_port,
-            remote_uri=args.server,
+            remote_uri=server,
             external_proxy=args.external_proxy,
             **kwargs
         )
     else:
+        server = args.server or defaults.tcp_url
         return HTTPClient(
-            uri=args.server,
+            uri=server,
             **kwargs
         )
 
 
 def run_non_interactive(parser):
     args = parser.parse_args()
+    if args.version:
+        print(version_string)
+        return
 
-    # Set verbosty
+    client = get_client(args, args.token)
+
     if args.verbose:
         logging.root.setLevel(logging.DEBUG)
-    # Create client
-    client = get_client(args, args.token)
+
     # Create file list and remove duplicates
     file_ids = set([f['id'] for f in args.manifest] + args.file_ids)
-    # Download files
+    log.info(version_string.replace('\n', ' - '))
     client.download_files(file_ids)
-
-
-def run_interactive(parser):
-    repl = ParcelREPL()
-    repl.prompt = colored('parcel > ', 'green')
-    repl.cmdloop()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -64,7 +68,7 @@ if __name__ == '__main__':
     #############################################################
     #                     General options
     #############################################################
-
+    parser.add_argument('--version', action='store_true')
     parser.add_argument('-m', '--manifest',
                         type=manifest.argparse_type,
                         default=list(),
@@ -76,7 +80,7 @@ if __name__ == '__main__':
                         help='Directory to download files to. '
                         'Defaults to current dir')
     parser.add_argument('-s', '--server', metavar='server', type=str,
-                        default=defaults.url,
+                        default=None,
                         help='The parcel server udt address server[:port]')
     parser.add_argument('file_ids', metavar='file_id', type=str,
                         nargs='*', help='uuids to download')
@@ -127,7 +131,4 @@ if __name__ == '__main__':
     #                       Start client
     #############################################################
 
-    if not sys.argv[1:]:
-        run_interactive(parser)
-    else:
-        run_non_interactive(parser)
+    run_non_interactive(parser)

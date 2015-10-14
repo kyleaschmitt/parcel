@@ -1,10 +1,11 @@
+from .portability import OS_WINDOWS
 from intervaltree import Interval, IntervalTree
 import os
-import tempfile
 import pickle
-from portability import OS_WINDOWS
-import string
 import random
+import string
+import tempfile
+import time
 
 if OS_WINDOWS:
     WINDOWS = True
@@ -17,8 +18,7 @@ else:
     WINDOWS = False
 
 from log import get_logger
-from utils import get_pbar, md5sum, mmap_open, set_file_length,\
-    get_file_type, STRIP
+from utils import get_pbar, md5sum, mmap_open, STRIP
 from const import SAVE_INTERVAL
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
@@ -27,20 +27,36 @@ log = get_logger('segment')
 
 class SegmentProducer(object):
 
-    def __init__(self, file_id, file_path, save_path, load_path, n_procs, size,
-                 save_interval=SAVE_INTERVAL, check_segment_md5sums=False):
+    save_interval = SAVE_INTERVAL
 
-        self.file_id = file_id
-        self.file_path = file_path
-        self.save_path = save_path
+    def __init__(self, download, n_procs):
+
+        assert download.size is not None,\
+            'Segment producer passed uninitizalied Download!'
+
+        self.download = download
         self.n_procs = n_procs
-        self.size = size
-        self.pbar = None
-        self.save_interval = save_interval
-        self.check_segment_md5sums = check_segment_md5sums
-        self.is_regular_file = False
 
-        # Setup producer
+        # Initialize producer
+        self.load_state()
+        self._setup_pbar()
+        self._setup_queues()
+        self._setup_work()
+        self.schedule()
+
+    def _setup_pbar(self):
+        self.pbar = None
+        self.pbar = get_pbar(self.download.ID, self.download.size)
+
+    def _setup_work(self):
+        if self.is_complete():
+            log.info('File already complete.')
+            return
+
+        work_size = self.integrate(self.work_pool)
+        self.block_size = work_size / self.n_procs
+
+    def _setup_queues(self):
         if WINDOWS:
             self.q_work = Queue()
             self.q_complete = Queue()
@@ -49,42 +65,18 @@ class SegmentProducer(object):
             self.q_work = manager.Queue()
             self.q_complete = manager.Queue()
 
-        # Setup work pool
-        self.load_state(load_path, size)
-        if self.is_complete():
-            log.info('File already complete.')
-            return
-
-        # Divide work among pool
-        work_size = self.integrate(self.work_pool)
-        self.block_size = work_size / n_procs
-
-        # Reporting
-        self.pbar = get_pbar(file_id, size)
-
-        # Create file if needed and schedule work
-        try:
-            set_file_length(self.file_path, self.size)
-        except:
-            log.warn(STRIP(
-                """Unable to set file length. File appears to
-                be a {} file, attempting to proceed.
-                """.format(get_file_type(self.file_path))))
-            self.is_regular_file = False
-        self.schedule()
-
     def integrate(self, itree):
         return sum([i.end-i.begin for i in itree.items()])
 
     def validate_segment_md5sums(self):
-        if not self.check_segment_md5sums:
+        if not self.download.check_segment_md5sums:
             return True
         corrupt_segments = 0
         intervals = sorted(self.completed.items())
         pbar = ProgressBar(widgets=[
-            'Checksumming {}: '.format(self.file_id), Percentage(), ' ',
+            'Checksumming {}: '.format(self.download.ID), Percentage(), ' ',
             Bar(marker='#', left='[', right=']'), ' ', ETA()])
-        with mmap_open(self.file_path) as data:
+        with mmap_open(self.download.path) as data:
             for interval in pbar(intervals):
                 log.debug('Checking segment md5: {}'.format(interval))
                 if not interval.data or 'md5sum' not in interval.data:
@@ -104,41 +96,43 @@ class SegmentProducer(object):
             log.warn('Redownloading {} currupt segments.'.format(
                 corrupt_segments))
 
-    def load_state(self, load_path, size):
+    def load_state(self):
         # Establish default intervals
-        self.work_pool = IntervalTree([Interval(0, size)])
+        self.work_pool = IntervalTree([Interval(0, self.download.size)])
         self.completed = IntervalTree()
         self.size_complete = 0
-
-        if not os.path.isfile(load_path) and os.path.isfile(self.file_path):
+        if not os.path.isfile(self.download.state_path)\
+           and os.path.isfile(self.download.path):
             log.warn(STRIP(
                 """A file named '{} was found but no state file was found at at
                 '{}'. Either this file was downloaded to a different
                 location, the state file was moved, or the state file
                 was deleted.  Parcel refuses to claim the file has
                 been successfully downloaded and will restart the
-                download.\n""").format(self.file_path, load_path))
+                download.\n""").format(
+                    self.download.path, self.download.state_path))
             return
 
-        if not os.path.isfile(load_path):
+        if not os.path.isfile(self.download.state_path):
+            self.download.setup_file()
             return
 
         # If there is a file at load_path, attempt to remove
         # downloaded sections from work_pool
         log.info('Found state file {}, attempting to resume download'.format(
-            load_path))
+            self.download.state_path))
 
-        if not os.path.isfile(self.file_path):
+        if not os.path.isfile(self.download.path):
             log.warn(STRIP(
                 """State file found at '{}' but no file for {}.
                 Restarting entire download.""".format(
-                    load_path, self.file_id)))
+                    self.download.state_path, self.download.ID)))
             return
         try:
-            with open(load_path, "rb") as f:
+            with open(self.download.state_path, "rb") as f:
                 self.completed = pickle.load(f)
             assert isinstance(self.completed, IntervalTree), \
-                "Bad save state: {}".format(load_path)
+                "Bad save state: {}".format(self.download.state_path)
         except Exception as e:
             self.completed = IntervalTree()
             log.error('Unable to resume file state: {}'.format(str(e)))
@@ -154,7 +148,7 @@ class SegmentProducer(object):
             # cross device links) in order to atomically write our save file
             temp = tempfile.NamedTemporaryFile(
                 prefix='.parcel_',
-                dir=os.path.abspath(os.path.join(self.save_path, os.pardir)),
+                dir=os.path.abspath(self.download.state_directory),
                 delete=False)
             # Write completed state
             pickle.dump(self.completed, temp)
@@ -165,7 +159,7 @@ class SegmentProducer(object):
 
             # Rename temp file as our save file, this could fail if
             # the state file and the temp directory are on different devices
-            if OS_WINDOWS and os.path.exists(self.save_path):
+            if OS_WINDOWS and os.path.exists(self.download.state_path):
                 # If we're on windows, there's not much we can do here
                 # except stash the old state file, rename the new one,
                 # and back up if there is a problem.
@@ -174,22 +168,22 @@ class SegmentProducer(object):
                     for _ in range(10)))
                 try:
                     # stash the old state file
-                    os.rename(self.save_path, old_path)
+                    os.rename(self.download.state_path, old_path)
                     # move the new state file into place
-                    os.rename(temp.name, self.save_path)
+                    os.rename(temp.name, self.download.state_path)
                     # if no exception, then delete the old stash
                     os.remove(old_path)
                 except Exception as msg:
                     log.error('Unable to write state file: {}'.format(msg))
                     try:
-                        os.rename(old_path, self.save_path)
+                        os.rename(old_path, self.download.state_path)
                     except:
                         pass
                     raise
             else:
                 # If we're not on windows, then we'll just try to
                 # atomically rename the file
-                os.rename(temp.name, self.save_path)
+                os.rename(temp.name, self.download.state_path)
 
         except KeyboardInterrupt:
             log.warn('Keyboard interrupt. removing temp save file'.format(
@@ -224,23 +218,36 @@ class SegmentProducer(object):
         try:
             self.pbar.update(self.size_complete)
         except Exception as e:
-            log.error('Unable to update pbar: {}'.format(str(e)))
+            log.debug('Unable to update pbar: {}'.format(str(e)))
 
     def check_file_exists_and_size(self):
-        if self.is_regular_file:
-            return (os.path.isfile(self.file_path)
-                    and os.path.getsize(self.file_path) == self.size)
+        if self.download.is_regular_file:
+            return (os.path.isfile(self.download.path)
+                    and os.path.getsize(
+                        self.download.path) == self.download.size)
         else:
             log.debug('File is not a regular file, refusing to check size.')
-            return (os.path.exists(self.file_path))
+            return (os.path.exists(self.download.path))
 
     def is_complete(self):
-        return (self.integrate(self.completed) == self.size and
+        return (self.integrate(self.completed) == self.download.size and
                 self.check_file_exists_and_size())
 
     def finish_download(self):
+        # Tell the children there is no more work, each child should
+        # pull one NoneType from the queue and exit
         for i in range(self.n_procs):
             self.q_work.put(None)
+
+        # Wait for all the children to exit by checking to make sure
+        # that everyone has taken their NoneType from the queue.
+        # Otherwise, the segment producer will exit before the
+        # children return, causing them to read from a closed queue
+        log.debug('Waiting for children to report')
+        while not self.q_work.empty():
+            time.sleep(0.1)
+
+        # Finish the progressbar
         if self.pbar:
             self.pbar.finish()
 

@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# Make sure the correct version of pyinstall is installed
+pip install 'PyInstaller==2.1'
+
+# Get version
+VERSION=$(python -c 'import parcel; print parcel.__version__')
+
+# Create binary
+pyinstaller --clean --noconfirm --onefile -c  parcel
+
+# Bundle app
 APPNAME="Parcel"
 
 BUNDLE="dist/${APPNAME}.app"
@@ -11,9 +21,10 @@ RESOURCES="${CONTENTS}/Resources"
 WRAPPER="${MacOS}/${APPNAME}"
 
 if [ -a "${BUNDLE}" ]; then
-    echo "${BUNDLE} already exists"
-    exit 1
+    rm -rf "${BUNDLE}"
 fi
+
+echo "Bundling to ${BUNDLE}"
 
 # Create bundle
 mkdir -p "${MacOS}"
@@ -43,3 +54,6 @@ echo '
 </dict>
 </plist>
 ' > "${CONTENTS}/Info.plist"
+
+# Zip dist
+zip "parcel_${VERSION}_OSX_x64.zip" "${BUNDLE}" "${SOURCE}"

@@ -1,15 +1,7 @@
 /******************************************************************************
  *
  * FILE    : parcel.h
- * AUTHOR  : Joshua Miller
- *           jshuasmiller@gmail.com              _
- * PROJECT : parcel                             | |
- *                      _ __   __ _ _ __ ___ ___| |
- *                     | '_ \ / _` | '__/ __/ _ \ |
- *                     | |_) | (_| | | | (_|  __/ |
- *                     | .__/ \__,_|_|  \___\___|_|
- *                     | |
- *                     |_|
+ * PROJECT : parcel
  *
  * DESCRIPTION : This file contains function definitions for starting
  *               proxy servers that translate between UDT and TCP.
