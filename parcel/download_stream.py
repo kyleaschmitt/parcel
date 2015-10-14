@@ -125,7 +125,11 @@ class DownloadStream(object):
                 "Unable to connect to API: ({}). Is this url correct: '{}'? "
                 "Is there a connection to the API? Is the server running?"
             ).format(str(e), self.uri))
-        r.raise_for_status()
+        try:
+            r.raise_for_status()
+        except Exception as e:
+            raise RuntimeError('{}: {}'.format(str(e), r.text))
+
         if close:
             r.close()
         return r

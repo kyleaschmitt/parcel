@@ -16,9 +16,9 @@ def main(args):
         logging.root.setLevel(logging.DEBUG)
 
     # Parse host
-    p = urlparse.urlparse(args.server.pop(0))
-    assert p.scheme, 'No url scheme specified'
-    port = p.port or {'https': '443', 'http': '80'}[p.scheme]
+    server = args.server.pop(0)
+    p = urlparse.urlparse('//' + ''.join(urlparse.urlparse(server)[1:]))
+    port = p.port or {'https': '443', 'http': '80'}.get(p.scheme, '80')
 
     # Start proxy
     log.info('Binding UDT<->TCP server {}:{} -> {}:{}'.format(
