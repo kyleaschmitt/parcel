@@ -27,9 +27,9 @@ def main(args):
         str(args.port),
         str(p.hostname),
         str(port),
-        args.mss,
-        args.udt_buffer_size,
-        args.udp_buffer_size,
+        int(args.mss),
+        int(args.udt_buffer_size),
+        int(args.udp_buffer_size),
     )
     assert proxy == 0, 'Proxy failed to start'
     while True:
