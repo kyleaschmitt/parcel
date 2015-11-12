@@ -37,15 +37,52 @@ EXTERN int udt2tcp_start(char *local_host, char *local_port,
      *  Incomming connections get their own thread and a proxied
      *  connection to remote_host:remote_port.
      */
+
+    int mss = MSS;
+    int udt_buffer_size = BUFF_SIZE*2;
+    int udp_buffer_size = BUFF_SIZE;
+
+    return udt2tcp_start_configurable(local_host,
+                                      local_port,
+                                      remote_host,
+                                      remote_port,
+                                      mss,
+                                      udt_buffer_size,
+                                      udp_buffer_size);
+
+}
+
+
+EXTERN int udt2tcp_start_configurable(char *local_host,
+                                      char *local_port,
+                                      char *remote_host,
+                                      char *remote_port,
+                                      int mss,
+                                      int udt_buffer_size,
+                                      int udp_buffer_size)
+{
+    /*
+     *  udt2tcp_start_configurable() - starts a configurable UDT proxy
+     *  server
+     *
+     *  Starts a proxy server listening on local_host:local_port.
+     *  Incomming connections get their own thread and a proxied
+     *  connection to remote_host:remote_port.
+     *
+     *  mss             : maximum segment size
+     *  udt_buffer_size : UDT buffer size in bytes
+     *  udp_buffer_size : UDP buffer size in bytes
+     *
+     */
     log("Proxy binding to local UDT socket [%s:%s] to remote TCP [%s:%s]",
         local_host, local_port, remote_host, remote_port);
+    debug("MSS            : %d", mss);
+    debug("UDT_BUFFER_SIZE: %d", udt_buffer_size);
+    debug("UDP_BUFFER_SIZE: %d", udp_buffer_size);
 
     addrinfo hints;
     addrinfo* res;
-    int mss = MSS;
     int reuseaddr = 1;
-    int udt_buffer_size = BUFF_SIZE*2;
-    int udp_buffer_size = BUFF_SIZE;
     UDTSOCKET udt_socket;
 
     /*******************************************************************
