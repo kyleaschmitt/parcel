@@ -31,6 +31,37 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
                          char *remote_host, char *remote_port)
 {
     /*
+     *  tcp2udt_start() - starts a UDT proxy server
+     *
+     *  Starts a proxy server listening on local_host:local_port.
+     *  Incomming connections get their own thread and a proxied
+     *  connection to remote_host:remote_port.
+     */
+
+    int mss = MSS;
+    int udt_buffer_size = BUFF_SIZE*2;
+    int udp_buffer_size = BUFF_SIZE;
+
+    return tcp2udt_start_configurable(local_host,
+                                      local_port,
+                                      remote_host,
+                                      remote_port,
+                                      mss,
+                                      udt_buffer_size,
+                                      udp_buffer_size);
+
+}
+
+
+EXTERN int tcp2udt_start_configurable(char *local_host,
+                                      char *local_port,
+                                      char *remote_host,
+                                      char *remote_port,
+                                      int mss,
+                                      int udt_buffer_size,
+                                      int udp_buffer_size)
+{
+    /*
      *  tcp2udt_start() - starts a TCP-to-UDT proxy thread
      *
      *  Starts a proxy server listening on local_host:local_port.
@@ -39,6 +70,9 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
      */
     log("Proxy binding to local TCP socket [%s:%s] to remote UDT [%s:%s]",
         local_host, local_port, remote_host, remote_port);
+    debug("MSS            : %d", mss);
+    debug("UDT_BUFFER_SIZE: %d", udt_buffer_size);
+    debug("UDP_BUFFER_SIZE: %d", udp_buffer_size);
 
     addrinfo hints;
     addrinfo* res;
@@ -91,9 +125,14 @@ EXTERN int tcp2udt_start(char *local_host, char *local_port,
     debug("Creating pipe2tcp server thread");
     pthread_t tcp2udt_server_thread;
     server_args_t *args = (server_args_t*) malloc(sizeof(server_args_t));
-    args->remote_host = strdup(remote_host);
-    args->remote_port = strdup(remote_port);
-    args->tcp_socket  = tcp_socket;
+    args->remote_host     = strdup(remote_host);
+    args->remote_port     = strdup(remote_port);
+    args->tcp_socket      = tcp_socket;
+    args->mss             = mss;
+    args->udt_buffer_size = udt_buffer_size;
+    args->udp_buffer_size = udp_buffer_size;
+
+
     if (pthread_create(&tcp2udt_server_thread, NULL, tcp2udt_accept_clients, args)){
         perror("unable to create tcp2udt server thread");
         free(args);
@@ -131,10 +170,13 @@ EXTERN void *tcp2udt_accept_clients(void *_args_)
 
         /* Create transcriber thread args */
         transcriber_args_t *transcriber_args = (transcriber_args_t *) malloc(sizeof(transcriber_args_t));
-        transcriber_args->udt_socket  = 0;  // will be set by thread_tcp2udt
-        transcriber_args->tcp_socket  = client_socket;
-        transcriber_args->remote_host = args->remote_host;
-        transcriber_args->remote_port = args->remote_port;
+        transcriber_args->udt_socket      = 0;  // will be set by thread_tcp2udt
+        transcriber_args->tcp_socket      = client_socket;
+        transcriber_args->remote_host     = args->remote_host;
+        transcriber_args->remote_port     = args->remote_port;
+        transcriber_args->mss             = args->mss;
+        transcriber_args->udt_buffer_size = args->udt_buffer_size;
+        transcriber_args->udp_buffer_size = args->udp_buffer_size;
 
         /* Create tcp2udt thread */
         pthread_t tcp_thread;
@@ -170,9 +212,9 @@ int connect_remote_udt(transcriber_args_t *args)
           args->remote_host, args->remote_port);
 
     UDTSOCKET udt_socket;
-    int mss = MSS;
-    int udt_buff = BUFF_SIZE;
-    int udp_buff = BUFF_SIZE;
+    int mss      = args->mss;
+    int udt_buff = args->udt_buffer_size;
+    int udp_buff = args->udp_buffer_size;
 
     /* Create address information */
     struct addrinfo hints, *local, *peer;
@@ -186,7 +228,9 @@ int connect_remote_udt(transcriber_args_t *args)
     }
 
     /* Create UDT socket */
-    udt_socket = UDT::socket(local->ai_family, local->ai_socktype, local->ai_protocol);
+    udt_socket = UDT::socket(local->ai_family,
+                             local->ai_socktype,
+                             local->ai_protocol);
     freeaddrinfo(local);
 
     /* Set UDT options */

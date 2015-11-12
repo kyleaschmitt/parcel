@@ -71,6 +71,9 @@ typedef struct server_args_t {
     int tcp_socket;
     char *remote_host;
     char *remote_port;
+    int mss;
+    int udt_buffer_size;
+    int udp_buffer_size;
 } server_args_t;
 
 typedef struct transcriber_args_t {
@@ -78,6 +81,9 @@ typedef struct transcriber_args_t {
     int tcp_socket;
     char *remote_host;
     char *remote_port;
+    int mss;
+    int udt_buffer_size;
+    int udp_buffer_size;
 } udt2tcp_args_t;
 
 typedef struct udt_pipe_args_t {
@@ -101,7 +107,17 @@ typedef struct tcp_pipe_args_t {
  *                   UDT client is recieved.
  *
  ******************************************************************************/
-EXTERN int udt2tcp_start(char *local_host, char *local_port, char *remote_host, char *remote_port);
+EXTERN int udt2tcp_start(char *local_host,
+                         char *local_port,
+                         char *remote_host,
+                         char *remote_port);
+EXTERN int udt2tcp_start_configurable(char *local_host,
+                                      char *local_port,
+                                      char *remote_host,
+                                      char *remote_port,
+                                      int mss,
+                                      int udt_buffer_size,
+                                      int udp_buffer_size);
 int connect_remote_tcp(transcriber_args_t *args);
 void *thread_udt2tcp(void *_args_);
 EXTERN void *udt2tcp_accept_clients(void *_args_);
@@ -117,7 +133,17 @@ EXTERN void *udt2tcp_accept_clients(void *_args_);
  *                   TCP client is recieved.
  *
  ******************************************************************************/
-EXTERN int tcp2udt_start(char *local_host, char *local_port, char *remote_host, char *remote_port);
+EXTERN int tcp2udt_start(char *local_host,
+                         char *local_port,
+                         char *remote_host,
+                         char *remote_port);
+EXTERN int tcp2udt_start_configurable(char *local_host,
+                                      char *local_port,
+                                      char *remote_host,
+                                      char *remote_port,
+                                      int mss,
+                                      int udt_buffer_size,
+                                      int udp_buffer_size);
 int connect_remote_udt(transcriber_args_t *args);
 void *thread_tcp2udt(void *_args_);
 EXTERN void *tcp2udt_accept_clients(void *_args_);

@@ -56,6 +56,7 @@ class Client(object):
         :returns: Fixed url with trailing / and scheme
 
         """
+
         uri = uri if uri.endswith('/') else '{}/'.format(uri)
         if not (uri.startswith('https://') or uri.startswith('http://')):
             uri = 'https://{}'.format(uri)
