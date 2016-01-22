@@ -57,9 +57,9 @@ class Client(object):
 
         """
 
-        uri = uri if uri.endswith('/') else '{}/'.format(uri)
+        uri = uri if uri.endswith('/') else '{uri}/'.format(uri=uri)
         if not (uri.startswith('https://') or uri.startswith('http://')):
-            uri = 'https://{}'.format(uri)
+            uri = 'https://{uri}'.format(uri=uri)
         return uri
 
     @staticmethod
@@ -116,7 +116,7 @@ class Client(object):
 
         # Log file ids
         for file_id in file_ids:
-            log.info('Given file id: {}'.format(file_id))
+            log.info('Given file id: {file}'.format(file=file_id))
 
         # Download each file
         downloaded, errors = [], {}
@@ -133,7 +133,7 @@ class Client(object):
 
             # Handle file download error, store error to print out later
             except Exception as e:
-                log.error('Unable to download {}: {}'.format(file_id, str(e)))
+                log.error('Unable to download {file}: {expt}'.format(file=file_id, expt=str(e)))
                 errors[file_id] = str(e)
                 if self.debug:
                     raise
@@ -144,18 +144,20 @@ class Client(object):
         # Print error messages
         self.print_summary(downloaded, errors)
         for file_id, error in errors.iteritems():
-            print('ERROR: {}: {}'.format(file_id, error))
+            print('ERROR: {file}: {expt}'.format(file=file_id, expt=error))
 
         return downloaded, errors
 
     def print_summary(self, downloaded, errors):
         print('\nSUMMARY:')
         if downloaded:
-            print('{}: {}'.format(
-                colored('Successfully downloaded', 'green'), len(downloaded)))
+            print('{color}: {down}'.format(
+                color=colored('Successfully downloaded', 'green'), 
+                down=len(downloaded)))
         if errors:
-            print('{}: {}'.format(
-                colored('Failed to download', 'red'), len(errors)))
+            print('{color}: {down}'.format(
+                color=colored('Failed to download', 'red'), 
+                down=len(errors)))
         print('')
 
     def serial_download(self, stream):
@@ -198,7 +200,7 @@ class Client(object):
                     if self.debug:
                         raise
                     else:
-                        log.error("Download aborted: {}".format(str(e)))
+                        log.error("Download aborted: {expt}".format(expt=str(e)))
 
         # Divide work amongst process pool
         pool = [Process(target=download_worker) for i in range(n_procs)]
