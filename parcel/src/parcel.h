@@ -34,6 +34,7 @@
 #include <iostream>
 #include <assert.h>
 #include <signal.h>
+#include <time.h>
 
 /* Non standard libraries */
 #include <udt>
@@ -166,7 +167,7 @@ void *pipe2tcp(void *_args_);
 #ifdef LOG
 #define log(fmt, ...)                                      \
     do {                                                   \
-        fprintf(stderr, "[parcel][%s][INFO] ", __func__);  \
+        fprintf(stderr, "[%i][parcel][%s][INFO] ",(int) time(NULL), __func__);  \
         fprintf(stderr, fmt, ##__VA_ARGS__);               \
         fprintf(stderr, "\n");                             \
     } while(0)
@@ -177,7 +178,7 @@ void *pipe2tcp(void *_args_);
 #ifdef DEBUG
 #define debug(fmt, ...)                                     \
     do {                                                    \
-        fprintf(stderr, "[parcel][%s][DEBUG] ", __func__);  \
+        fprintf(stderr, "[%i][parcel][%s][DEBUG] ",(int) time(NULL), __func__);  \
         fprintf(stderr, fmt, ##__VA_ARGS__);                \
         fprintf(stderr, "\n");                              \
     } while(0)
@@ -187,7 +188,7 @@ void *pipe2tcp(void *_args_);
 
 #define error(fmt, ...)                                     \
     do {                                                    \
-        fprintf(stderr, "[parcel][%s][ERROR] ", __func__);  \
+        fprintf(stderr, "[%i][parcel][%s][ERROR] ",(int) time(NULL), __func__);  \
         fprintf(stderr, fmt, ##__VA_ARGS__);                \
         fprintf(stderr, "\n");                              \
     } while(0)
